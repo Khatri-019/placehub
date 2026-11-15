@@ -56,7 +56,8 @@ export function StudentJobDetails() {
                 <dd>{j.eligibleBranches.length ? j.eligibleBranches.map((b) => BRANCH_LABELS[b]).join(', ') : 'All branches'}</dd>
                 <dt>Graduation years</dt>
                 <dd>{j.eligibleGraduationYears.length ? j.eligibleGraduationYears.join(', ') : 'All years'}</dd>
-                <dt>CTC</dt><dd>{j.ctc ?? 'Not disclosed'}</dd>
+                <dt>CTC</dt>
+                <dd>{j.ctcLpa != null ? `${Number(j.ctcLpa).toFixed(2)} LPA` : 'Not specified'}{j.ctc ? ` (${j.ctc})` : ''}</dd>
                 <dt>Deadline</dt><dd>{formatDateTime(j.deadline)}</dd>
               </dl>
             </section>

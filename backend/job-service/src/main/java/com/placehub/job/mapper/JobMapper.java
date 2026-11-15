@@ -20,7 +20,7 @@ public final class JobMapper {
     public static JobResponse toResponse(Job j) {
         return new JobResponse(j.getId(), j.getCompany().getId(), j.getCompany().getName(),
                 j.getRecruiterOwnerUserId(), j.getTitle(), j.getDescription(), j.getLocation(),
-                j.getEmploymentType(), j.getCtc(), j.getMinCgpa(), j.getMaxBacklogs(),
+                j.getEmploymentType(), j.getCtc(), j.getCtcLpa(), j.getMinCgpa(), j.getMaxBacklogs(),
                 j.getEligibleBranches().stream().sorted().toList(),
                 j.getEligibleGraduationYears().stream().sorted().toList(),
                 j.getDeadline(), j.getStatus(), j.getCreatedAt(), j.getUpdatedAt());
@@ -28,6 +28,7 @@ public final class JobMapper {
 
     public static JobSummaryResponse toSummary(Job j) {
         return new JobSummaryResponse(j.getId(), j.getTitle(), j.getCompany().getId(), j.getCompany().getName(),
-                j.getRecruiterOwnerUserId(), j.getStatus(), j.getDeadline());
+                j.getRecruiterOwnerUserId(), j.getStatus(), j.getDeadline(), j.getCtcLpa(),
+                j.getEmploymentType());
     }
 }

@@ -63,7 +63,8 @@ class ApplicationServiceTest {
     void setUp() {
         when(deps.academicProfile(student.id())).thenReturn(profile("ACTIVE"));
         when(deps.jobSummary(jobId)).thenReturn(new ClientDtos.JobSummary(jobId, "Graduate SE", UUID.randomUUID(),
-                "Northstar", recruiterId, "PUBLISHED", Instant.now().plusSeconds(3600)));
+                "Northstar", recruiterId, "PUBLISHED", Instant.now().plusSeconds(3600), new BigDecimal("12.00"),
+                "FULL_TIME"));
         when(writer.create(any())).thenAnswer(inv -> inv.getArgument(0));
         when(writer.changeStatus(any(), any(), any(), any())).thenAnswer(inv -> {
             Application a = inv.getArgument(0);
@@ -87,6 +88,8 @@ class ApplicationServiceTest {
         assertThat(res.companyName()).isEqualTo("Northstar");
         assertThat(res.cgpa()).isEqualByComparingTo("8.60");
         assertThat(res.studentUserId()).isEqualTo(student.id());
+        assertThat(res.ctcLpa()).isEqualByComparingTo("12.00");
+        assertThat(res.employmentType()).isEqualTo("FULL_TIME");
         verify(writer).create(any());
     }
 

@@ -11,6 +11,7 @@ import java.util.UUID;
 
 public record JobResponse(UUID id, UUID companyId, String companyName, UUID recruiterOwnerUserId, String title,
                           String description, String location, EmploymentType employmentType, String ctc,
+                          BigDecimal ctcLpa,
                           BigDecimal minCgpa, int maxBacklogs, List<Branch> eligibleBranches,
                           List<Integer> eligibleGraduationYears, Instant deadline, JobStatus status,
                           Instant createdAt, Instant updatedAt) {

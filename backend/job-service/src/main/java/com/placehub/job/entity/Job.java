@@ -58,6 +58,10 @@ public class Job {
     @Column(length = 100)
     private String ctc;
 
+    /** Numeric CTC in lakhs per annum; required to publish a FULL_TIME job (spec 20.1). */
+    @Column(name = "ctc_lpa", precision = 6, scale = 2)
+    private BigDecimal ctcLpa;
+
     @Column(name = "min_cgpa", nullable = false, precision = 4, scale = 2)
     private BigDecimal minCgpa;
 
@@ -113,13 +117,14 @@ public class Job {
     }
 
     public void applyDetails(String title, String description, String location, EmploymentType type, String ctc,
-                             BigDecimal minCgpa, int maxBacklogs, Set<Branch> branches, Set<Integer> years,
+                             BigDecimal ctcLpa, BigDecimal minCgpa, int maxBacklogs, Set<Branch> branches, Set<Integer> years,
                              Instant deadline) {
         this.title = title;
         this.description = description;
         this.location = location;
         this.employmentType = type;
         this.ctc = ctc;
+        this.ctcLpa = ctcLpa;
         this.minCgpa = minCgpa;
         this.maxBacklogs = maxBacklogs;
         this.eligibleBranches.clear();
@@ -171,6 +176,10 @@ public class Job {
 
     public String getCtc() {
         return ctc;
+    }
+
+    public BigDecimal getCtcLpa() {
+        return ctcLpa;
     }
 
     public BigDecimal getMinCgpa() {

@@ -15,6 +15,7 @@ interface FormState {
   location: string;
   employmentType: EmploymentType;
   ctc: string;
+  ctcLpa: string;
   minCgpa: string;
   maxBacklogs: string;
   eligibleBranches: Branch[];
@@ -23,7 +24,7 @@ interface FormState {
 }
 
 const EMPTY: FormState = {
-  title: '', description: '', location: '', employmentType: 'FULL_TIME', ctc: '', minCgpa: '0', maxBacklogs: '0',
+  title: '', description: '', location: '', employmentType: 'FULL_TIME', ctc: '', ctcLpa: '', minCgpa: '0', maxBacklogs: '0',
   eligibleBranches: [], years: '', deadline: '',
 };
 
@@ -40,6 +41,12 @@ function validate(f: FormState): Record<string, string> {
   if (!f.location.trim()) e.location = 'Location is required';
   const cgpa = Number(f.minCgpa);
   if (Number.isNaN(cgpa) || cgpa < 0 || cgpa > 10) e.minCgpa = 'Between 0 and 10';
+  if (f.ctcLpa.trim()) {
+    const ctc = Number(f.ctcLpa);
+    if (Number.isNaN(ctc) || ctc <= 0 || ctc > 9999.99) e.ctcLpa = 'Between 0.01 and 9999.99 LPA';
+  } else if (f.employmentType === 'FULL_TIME') {
+    e.ctcLpa = 'Required for full-time jobs';
+  }
   const backlogs = Number(f.maxBacklogs);
   if (!Number.isInteger(backlogs) || backlogs < 0 || backlogs > 50) e.maxBacklogs = 'Between 0 and 50';
   if (parseYears(f.years) === null) e.years = 'Comma-separated years between 2020 and 2035';
@@ -63,7 +70,7 @@ export function RecruiterJobForm() {
     jobApi.get(id)
       .then((j) => setForm({
         title: j.title, description: j.description, location: j.location, employmentType: j.employmentType,
-        ctc: j.ctc ?? '', minCgpa: String(j.minCgpa), maxBacklogs: String(j.maxBacklogs),
+        ctc: j.ctc ?? '', ctcLpa: j.ctcLpa == null ? '' : String(j.ctcLpa), minCgpa: String(j.minCgpa), maxBacklogs: String(j.maxBacklogs),
         eligibleBranches: j.eligibleBranches, years: j.eligibleGraduationYears.join(', '), deadline: toLocalInput(j.deadline),
       }))
       .catch((err) => setLoadError(parseError(err)))
@@ -88,6 +95,7 @@ export function RecruiterJobForm() {
       location: form.location.trim(),
       employmentType: form.employmentType,
       ctc: form.ctc.trim() || undefined,
+      ctcLpa: form.ctcLpa.trim() ? Math.round(Number(form.ctcLpa) * 100) / 100 : undefined,
       minCgpa: Math.round(Number(form.minCgpa) * 100) / 100,
       maxBacklogs: Number(form.maxBacklogs),
       eligibleBranches: form.eligibleBranches,
@@ -143,7 +151,11 @@ export function RecruiterJobForm() {
               </select>
             )}
           </Field>
-          <Field id="ctc" label="CTC (optional)" error={errors.ctc}>
+          <Field id="ctcLpa" label="CTC (LPA)" error={errors.ctcLpa}
+            hint={form.employmentType === 'FULL_TIME' ? 'Lakhs per annum; required to publish' : 'Optional for internships'}>
+            {(a) => <input {...a} type="number" step="0.01" min={0.01} value={form.ctcLpa} onChange={(e) => setForm({ ...form, ctcLpa: e.target.value })} />}
+          </Field>
+          <Field id="ctc" label="CTC label (optional)" error={errors.ctc}>
             {(a) => <input {...a} maxLength={100} value={form.ctc} onChange={(e) => setForm({ ...form, ctc: e.target.value })} />}
           </Field>
         </div>

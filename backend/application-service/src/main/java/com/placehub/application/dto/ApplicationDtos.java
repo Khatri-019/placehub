@@ -29,7 +29,7 @@ public final class ApplicationDtos {
                                       String jobTitle, String companyName, String studentName, String studentEmail,
                                       String branch, BigDecimal cgpa, int graduationYear, int backlogCount,
                                       ApplicationStatus status, String recruiterNote, Instant appliedAt,
-                                      Instant updatedAt) {
+                                      Instant updatedAt, BigDecimal ctcLpa, String employmentType) {
     }
 
     public record EligibilityPreview(UUID jobId, boolean eligible, List<String> reasons, boolean alreadyApplied) {

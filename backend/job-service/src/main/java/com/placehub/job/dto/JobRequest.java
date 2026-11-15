@@ -21,6 +21,7 @@ public record JobRequest(
         @NotBlank @Size(max = 150) String location,
         @NotNull EmploymentType employmentType,
         @Size(max = 100) String ctc,
+        @DecimalMin("0.01") @DecimalMax("9999.99") @Digits(integer = 4, fraction = 2) BigDecimal ctcLpa,
         @DecimalMin("0.00") @DecimalMax("10.00") @Digits(integer = 2, fraction = 2) BigDecimal minCgpa,
         @Min(0) @Max(50) Integer maxBacklogs,
         Set<@NotNull Branch> eligibleBranches,

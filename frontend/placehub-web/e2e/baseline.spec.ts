@@ -88,6 +88,9 @@ test('admin pages load with live data', async ({ page }) => {
   await signIn(page, SEEDED.admin, DEMO_PASSWORD, 'admin');
   await page.goto('/admin/users');
   await expect(page.getByRole('heading', { level: 1, name: 'Users' })).toBeVisible();
+  // The list is newest-first and test runs keep adding users, so search for the seeded account.
+  await page.getByLabel('Name or email').fill(SEEDED.student);
+  await page.getByRole('button', { name: 'Search' }).click();
   await expect(page.getByRole('cell', { name: SEEDED.student, exact: true })).toBeVisible();
   await page.goto('/admin/jobs');
   await expect(page.getByRole('cell', { name: 'Graduate Software Engineer' }).first()).toBeVisible();

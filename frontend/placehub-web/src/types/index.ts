@@ -105,6 +105,8 @@ export interface Job {
   location: string;
   employmentType: EmploymentType;
   ctc?: string | null;
+  /** Numeric CTC in lakhs per annum (required to publish FULL_TIME jobs). */
+  ctcLpa?: number | null;
   minCgpa: number;
   maxBacklogs: number;
   eligibleBranches: Branch[];
@@ -121,6 +123,7 @@ export interface JobRequest {
   location: string;
   employmentType: EmploymentType;
   ctc?: string;
+  ctcLpa?: number;
   minCgpa?: number;
   maxBacklogs?: number;
   eligibleBranches: Branch[];
@@ -145,6 +148,8 @@ export interface Application {
   recruiterNote?: string | null;
   appliedAt: string;
   updatedAt: string;
+  ctcLpa?: number | null;
+  employmentType?: EmploymentType | null;
 }
 
 export interface EligibilityPreview {

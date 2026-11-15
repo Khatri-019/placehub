@@ -17,6 +17,7 @@ public final class ApplicationMapper {
                 a.getJobTitleSnapshot(), a.getCompanyNameSnapshot(), a.getStudentNameSnapshot(),
                 a.getStudentEmailSnapshot(), a.getBranchSnapshot(), a.getCgpaSnapshot(),
                 a.getGraduationYearSnapshot(), a.getBacklogCountSnapshot(), a.getStatus(),
-                includeRecruiterNote ? a.getRecruiterNote() : null, a.getAppliedAt(), a.getUpdatedAt());
+                includeRecruiterNote ? a.getRecruiterNote() : null, a.getAppliedAt(), a.getUpdatedAt(),
+                a.getCtcLpaSnapshot(), a.getEmploymentTypeSnapshot());
     }
 }

@@ -51,7 +51,9 @@ Phase 9 (v3, BUILD_SPEC §20):
       apply 201 via gateway, outbox drained ~18 s after Kafka start, notification delivered; host spring-boot:run on
       India Standard Time with plugin TZ flag overridden → ready + login 200, 0 TZ errors; enforcer fails on JDK 22;
       Playwright baseline 8/8 (no UI bugs found); `./mvnw clean verify` 178 tests, 0 skipped
-- [ ] 9.1 Numeric CTC (`ctcLpa`), recruiter2/Meridian seed, summary + snapshots
+- [x] 9.1 Numeric CTC — job V2 migration + app V2 snapshots; JobServiceTest +3 (publish rule, summary), JobServiceIT
+      summary ctc/type + Meridian; job+app modules 132 tests pass, user-service verify pass; compose: recruiter2 sees
+      Quant 30.00/Senior DE 20.00, seeded CTCs 12/8/18, intern null; smoke 34/34; Playwright 8/8
 - [ ] 9.2 Resume upload/download, IDOR-safe application resume, frontend resume card
 - [ ] 9.3 Placement policy engine (versions, evaluator, consent, placements, locks, audit, admin UI)
 - [ ] 9.4 Auto-shortlisting, status history, bulk status, auto-screen
@@ -63,7 +65,7 @@ Phase 9 (v3, BUILD_SPEC §20):
 Definition of Done (v2 §17): all [x] (see git history of this file). Frontend click-through gap closes with Playwright.
 
 ## 5. Current state
-- Phase 9.1 (numeric CTC + seeds) next. Stack running in compose.
+- Phase 9.2 (resumes) next. Stack running in compose with 9.1 images.
 
 ## 6. Known issues / deviations from spec
 - Java 25 instead of 21 (user edit). VS Code redhat.java may race on `target/` → rerun `./mvnw clean verify`.

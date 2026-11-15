@@ -76,6 +76,9 @@ public class JobService {
         if (job.getStatus() == JobStatus.PUBLISHED && !req.deadline().isAfter(clock.instant())) {
             throw ApiException.badRequest("A published job's deadline must be in the future");
         }
+        if (job.getStatus() == JobStatus.PUBLISHED) {
+            requireCtcForFullTime(req.employmentType(), req.ctcLpa());
+        }
         applyRequest(job, req);
         jobs.saveAndFlush(job);
         return JobMapper.toResponse(job);
@@ -91,6 +94,7 @@ public class JobService {
         if (!job.getDeadline().isAfter(clock.instant())) {
             throw ApiException.badRequest("The deadline must be in the future to publish");
         }
+        requireCtcForFullTime(job.getEmploymentType(), job.getCtcLpa());
         job.setStatus(JobStatus.PUBLISHED);
         jobs.saveAndFlush(job);
         return JobMapper.toResponse(job);
@@ -188,6 +192,14 @@ public class JobService {
         return jobs.findById(jobId).orElseThrow(JobService::jobNotFound);
     }
 
+    static final String CTC_REQUIRED = "A full-time job needs a numeric CTC (ctcLpa, lakhs per annum) to be published";
+
+    static void requireCtcForFullTime(EmploymentType type, BigDecimal ctcLpa) {
+        if (type == EmploymentType.FULL_TIME && ctcLpa == null) {
+            throw ApiException.badRequest(CTC_REQUIRED);
+        }
+    }
+
     static void requireOwner(AuthUser user, Job job) {
         if (!user.isRecruiter() || !job.isOwnedBy(user.id())) {
             throw ApiException.forbidden(NOT_OWNER);
@@ -202,6 +214,7 @@ public class JobService {
         BigDecimal minCgpa = req.minCgpa() == null ? BigDecimal.ZERO : req.minCgpa();
         job.applyDetails(req.title().trim(), req.description().trim(), req.location().trim(), req.employmentType(),
                 req.ctc() == null || req.ctc().isBlank() ? null : req.ctc().trim(),
+                req.ctcLpa() == null ? null : req.ctcLpa().setScale(2, RoundingMode.HALF_UP),
                 minCgpa.setScale(2, RoundingMode.HALF_UP),
                 req.maxBacklogs() == null ? 0 : req.maxBacklogs(),
                 req.eligibleBranches(), req.eligibleGraduationYears(), req.deadline());

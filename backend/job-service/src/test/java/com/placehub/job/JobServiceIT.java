@@ -67,7 +67,7 @@ class JobServiceIT {
     String jobBody(String title) {
         return """
                 {"title":"%s","description":"Write code","location":"Pune","employmentType":"FULL_TIME",
-                 "minCgpa":7.0,"maxBacklogs":0,"eligibleBranches":["CSE","ISE"],"eligibleGraduationYears":[2027],
+                 "ctcLpa":14.5,"minCgpa":7.0,"maxBacklogs":0,"eligibleBranches":["CSE","ISE"],"eligibleGraduationYears":[2027],
                  "deadline":"%s"}""".formatted(title, Instant.now().plus(10, ChronoUnit.DAYS));
     }
 
@@ -164,7 +164,19 @@ class JobServiceIT {
         mvc.perform(get("/internal/jobs/" + JOB1 + "/summary").header("X-Internal-Token", "it-internal-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.companyName").value("Northstar Technologies"))
-                .andExpect(jsonPath("$.recruiterOwnerUserId").value(SEEDED_RECRUITER));
+                .andExpect(jsonPath("$.recruiterOwnerUserId").value(SEEDED_RECRUITER))
+                .andExpect(jsonPath("$.ctcLpa").value(12.0))
+                .andExpect(jsonPath("$.employmentType").value("FULL_TIME"));
+        mvc.perform(get("/internal/jobs/20000000-0000-0000-0000-000000000006/summary")
+                        .header("X-Internal-Token", "it-internal-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.companyName").value("Meridian Analytics"))
+                .andExpect(jsonPath("$.ctcLpa").value(30.0))
+                .andExpect(jsonPath("$.recruiterOwnerUserId").value("00000000-0000-0000-0000-000000000005"));
+        mvc.perform(get("/internal/jobs/20000000-0000-0000-0000-000000000002/summary")
+                        .header("X-Internal-Token", "it-internal-token"))
+                .andExpect(jsonPath("$.employmentType").value("INTERNSHIP"))
+                .andExpect(jsonPath("$.ctcLpa").doesNotExist());
         mvc.perform(get("/internal/jobs/" + UUID.randomUUID() + "/summary").header("X-Internal-Token", "it-internal-token"))
                 .andExpect(status().isNotFound());
     }

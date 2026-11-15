@@ -73,7 +73,7 @@ export function StudentJobs() {
                       <span>{job.companyName}</span>
                       <span>{job.location}</span>
                       <span>{EMPLOYMENT_TYPE_LABELS[job.employmentType]}</span>
-                      {job.ctc && <span>{job.ctc}</span>}
+                      {job.ctcLpa != null ? <span>{Number(job.ctcLpa).toFixed(2)} LPA</span> : job.ctc && <span>{job.ctc}</span>}
                     </div>
                   </div>
                   <div className="small muted">

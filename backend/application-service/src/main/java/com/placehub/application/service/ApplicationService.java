@@ -66,6 +66,7 @@ public class ApplicationService {
         Application application = new Application(UUID.randomUUID(), jobId, student.id(),
                 job.recruiterOwnerUserId(), job.title(), job.companyName(), profile.fullName(), profile.email(),
                 profile.branch(), profile.cgpa(), profile.graduationYear(), profile.backlogCount());
+        application.snapshotJobTerms(job.ctcLpa(), job.employmentType());
         try {
             return ApplicationMapper.toResponse(writer.create(application), false);
         } catch (DataIntegrityViolationException e) {

@@ -26,6 +26,16 @@ public final class ClientDtos {
 
     /** Job Service GET /internal/jobs/{id}/summary. */
     public record JobSummary(UUID jobId, String title, UUID companyId, String companyName, UUID recruiterOwnerUserId,
-                             String status, Instant deadline) {
+                             String status, Instant deadline, BigDecimal ctcLpa, String employmentType) {
+
+        /** Compact constructor for callers that predate the v3 fields. */
+        public JobSummary(UUID jobId, String title, UUID companyId, String companyName, UUID recruiterOwnerUserId,
+                          String status, Instant deadline) {
+            this(jobId, title, companyId, companyName, recruiterOwnerUserId, status, deadline, null, null);
+        }
+
+        public boolean isFullTime() {
+            return "FULL_TIME".equals(employmentType);
+        }
     }
 }

@@ -19,3 +19,13 @@ INSERT INTO student_details (user_id, college_name, branch, graduation_year, cgp
   ('00000000-0000-0000-0000-000000000003', 'PlaceHub Institute of Technology', 'CSE', 2027, 8.60, 0),
   ('00000000-0000-0000-0000-000000000004', 'PlaceHub Institute of Technology', 'ME', 2027, 6.40, 2)
 ON CONFLICT (user_id) DO NOTHING;
+
+-- v3 (spec 20.1): second recruiter, owner of Meridian Analytics in Job Service. Password PlaceHub@123.
+INSERT INTO users (id, full_name, email, password_hash, role, account_status, created_at, updated_at) VALUES
+  ('00000000-0000-0000-0000-000000000005', 'Meera Recruiter', 'recruiter2@placehub.local',
+   '$2a$10$4txQ8RjbqmLHIX/BM1kQdOFAwZ4z0v3nRkCglq6GRJYkLJB49Goei', 'RECRUITER', 'ACTIVE', NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO recruiter_details (user_id, company_name, designation) VALUES
+  ('00000000-0000-0000-0000-000000000005', 'Meridian Analytics', 'Campus Hiring Manager')
+ON CONFLICT (user_id) DO NOTHING;

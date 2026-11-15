@@ -129,7 +129,8 @@ class ApplicationServiceIT {
         wiremock.stubFor(get(urlEqualTo("/internal/jobs/" + jobId + "/summary"))
                 .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("""
                         {"jobId":"%s","title":"IT Job","companyId":"%s","companyName":"IT Corp",
-                         "recruiterOwnerUserId":"%s","status":"PUBLISHED","deadline":"2099-01-01T00:00:00Z"}"""
+                         "recruiterOwnerUserId":"%s","status":"PUBLISHED","deadline":"2099-01-01T00:00:00Z",
+                         "ctcLpa":11.5,"employmentType":"FULL_TIME"}"""
                         .formatted(jobId, UUID.randomUUID(), recruiterId))));
     }
 
@@ -147,6 +148,8 @@ class ApplicationServiceIT {
         JsonNode created = json.readTree(body);
         UUID applicationId = UUID.fromString(created.get("id").asString());
         assertThat(created.get("companyName").asString()).isEqualTo("IT Corp");
+        assertThat(created.get("ctcLpa").decimalValue()).isEqualByComparingTo("11.50");
+        assertThat(created.get("employmentType").asString()).isEqualTo("FULL_TIME");
         wiremock.verify(getRequestedFor(urlPathMatching("/internal/users/.*/academic-profile"))
                 .withHeader("X-Correlation-Id", equalTo("it-corr-1")));
 

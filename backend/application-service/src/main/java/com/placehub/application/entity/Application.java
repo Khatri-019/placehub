@@ -60,6 +60,12 @@ public class Application {
     @Column(name = "backlog_count_snapshot", nullable = false)
     private int backlogCountSnapshot;
 
+    @Column(name = "ctc_lpa_snapshot", precision = 6, scale = 2)
+    private BigDecimal ctcLpaSnapshot;
+
+    @Column(name = "employment_type_snapshot", length = 20)
+    private String employmentTypeSnapshot;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ApplicationStatus status;
@@ -107,6 +113,12 @@ public class Application {
     @PreUpdate
     void onUpdate() {
         updatedAt = Instant.now();
+    }
+
+    /** Job compensation snapshot taken at apply time (spec 20.1); never changes afterwards. */
+    public void snapshotJobTerms(BigDecimal ctcLpa, String employmentType) {
+        this.ctcLpaSnapshot = ctcLpa;
+        this.employmentTypeSnapshot = employmentType;
     }
 
     public void changeStatus(ApplicationStatus newStatus, String note) {
@@ -163,6 +175,14 @@ public class Application {
 
     public int getBacklogCountSnapshot() {
         return backlogCountSnapshot;
+    }
+
+    public BigDecimal getCtcLpaSnapshot() {
+        return ctcLpaSnapshot;
+    }
+
+    public String getEmploymentTypeSnapshot() {
+        return employmentTypeSnapshot;
     }
 
     public ApplicationStatus getStatus() {

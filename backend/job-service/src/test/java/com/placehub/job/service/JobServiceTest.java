@@ -52,13 +52,15 @@ class JobServiceTest {
         company = new Company(UUID.randomUUID(), ownerId);
         company.update("Northstar", null, null, null);
         job = new Job(UUID.randomUUID(), company);
-        job.applyDetails("SE", "desc", "Pune", EmploymentType.FULL_TIME, null, new BigDecimal("7.00"), 0,
+        job.applyDetails("SE", "desc", "Pune", EmploymentType.FULL_TIME, null, new BigDecimal("12.00"),
+                new BigDecimal("7.00"), 0,
                 Set.of(Branch.CSE), Set.of(), NOW.plusSeconds(86400));
         when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
     }
 
     JobRequest request(Instant deadline) {
-        return new JobRequest("SE II", "desc", "Pune", EmploymentType.FULL_TIME, "10 LPA", null, null,
+        return new JobRequest("SE II", "desc", "Pune", EmploymentType.FULL_TIME, "10 LPA", new BigDecimal("10.00"),
+                null, null,
                 Set.of(Branch.CSE, Branch.ISE), Set.of(2027), deadline);
     }
 
@@ -107,14 +109,42 @@ class JobServiceTest {
 
     @Test
     void publishRequiresFutureDeadlineAndDraft() {
-        job.applyDetails("SE", "d", "P", EmploymentType.FULL_TIME, null, BigDecimal.ZERO, 0, Set.of(), Set.of(), NOW);
+        job.applyDetails("SE", "d", "P", EmploymentType.FULL_TIME, null, new BigDecimal("12.00"), BigDecimal.ZERO, 0, Set.of(), Set.of(), NOW);
         assertThatThrownBy(() -> service.publish(owner, job.getId()))
                 .satisfies(e -> assertThat(status(e)).isEqualTo(HttpStatus.BAD_REQUEST));
-        job.applyDetails("SE", "d", "P", EmploymentType.FULL_TIME, null, BigDecimal.ZERO, 0, Set.of(), Set.of(),
+        job.applyDetails("SE", "d", "P", EmploymentType.FULL_TIME, null, new BigDecimal("12.00"), BigDecimal.ZERO, 0, Set.of(), Set.of(),
                 NOW.plusSeconds(1));
         assertThat(service.publish(owner, job.getId()).status()).isEqualTo(JobStatus.PUBLISHED);
         assertThatThrownBy(() -> service.publish(owner, job.getId()))
                 .satisfies(e -> assertThat(status(e)).isEqualTo(HttpStatus.CONFLICT));
+    }
+
+    @Test
+    void fullTimeJobsNeedNumericCtcToPublishButInternshipsDoNot() {
+        job.applyDetails("SE", "d", "P", EmploymentType.FULL_TIME, "Competitive", null, BigDecimal.ZERO, 0, Set.of(),
+                Set.of(), NOW.plusSeconds(60));
+        assertThatThrownBy(() -> service.publish(owner, job.getId()))
+                .hasMessage(JobService.CTC_REQUIRED)
+                .satisfies(e -> assertThat(status(e)).isEqualTo(HttpStatus.BAD_REQUEST));
+        job.applyDetails("Intern", "d", "P", EmploymentType.INTERNSHIP, "30k per month", null, BigDecimal.ZERO, 0,
+                Set.of(), Set.of(), NOW.plusSeconds(60));
+        assertThat(service.publish(owner, job.getId()).status()).isEqualTo(JobStatus.PUBLISHED);
+    }
+
+    @Test
+    void publishedFullTimeJobCannotDropItsCtc() {
+        job.setStatus(JobStatus.PUBLISHED);
+        JobRequest noCtc = new JobRequest("SE II", "desc", "Pune", EmploymentType.FULL_TIME, "10 LPA", null, null,
+                null, Set.of(), Set.of(), NOW.plusSeconds(600));
+        assertThatThrownBy(() -> service.update(owner, job.getId(), noCtc))
+                .satisfies(e -> assertThat(status(e)).isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void summaryCarriesCtcAndEmploymentType() {
+        var summary = service.summary(job.getId());
+        assertThat(summary.ctcLpa()).isEqualByComparingTo("12.00");
+        assertThat(summary.employmentType()).isEqualTo(EmploymentType.FULL_TIME);
     }
 
     @Test

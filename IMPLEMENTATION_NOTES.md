@@ -116,5 +116,16 @@ Longer rationale for decisions. Operational status lives in `CLAUDE.md`; the spe
     `frontend/placehub-web/e2e`. Tests arrange their own recruiters, companies and jobs through the gateway API, so
     seeded demo data stays clean. The baseline suite of 8 v2 flows passed on the first run and found no UI bugs.
 
+### 9.1 Numeric CTC
+30. `jobs.ctc_lpa DECIMAL(6,2)` (Flyway V2). Publishing a FULL_TIME job without it returns 400, and so does a PUT on
+    a published FULL_TIME job that drops it. The existing smoke job and the JobServiceIT payload now send `ctcLpa`;
+    they were updated in place, not removed.
+31. The seed is a repeatable migration, so editing it re-runs it: idempotent `UPDATE ... WHERE ctc_lpa IS NULL` sets
+    the CTC on existing databases, and `INSERT IGNORE` / `ON CONFLICT DO NOTHING` add recruiter2 and Meridian.
+32. `ClientDtos.JobSummary` keeps a 7-argument constructor for older callers. Snapshots are nullable because rows
+    created before v3 have none.
+33. Playwright fix (a test bug, not an app bug): the admin users table is newest-first, so the test searches for the
+    seeded student instead of expecting it on page 1.
+
 ## Checklist (mirrors spec section 17; proof recorded in CLAUDE.md)
 See `CLAUDE.md` section 4.

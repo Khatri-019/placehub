@@ -118,7 +118,7 @@ step 3 "Recruiter creates a company and creates + publishes a job (min CGPA 7.0,
 req POST /api/companies "$RECRUITER_TOKEN" "{\"name\":\"Smoke Corp $RUN_ID\",\"industry\":\"Software\"}"
 expect_code 201 "create company"
 req POST /api/jobs "$RECRUITER_TOKEN" "{\"title\":\"$JOB_TITLE\",\"description\":\"Smoke test job\",\"location\":\"Pune\",
-  \"employmentType\":\"FULL_TIME\",\"minCgpa\":7.0,\"maxBacklogs\":0,\"eligibleBranches\":[\"CSE\",\"ISE\"],
+  \"employmentType\":\"FULL_TIME\",\"ctcLpa\":11.0,\"minCgpa\":7.0,\"maxBacklogs\":0,\"eligibleBranches\":[\"CSE\",\"ISE\"],
   \"eligibleGraduationYears\":[],\"deadline\":\"$(future_iso 7)\"}"
 expect_code 201 "create job (draft)"
 JOB_ID="$(json '.id')"
