@@ -31,6 +31,7 @@ rationale: IMPLEMENTATION_NOTES.md. On a new session/compaction: read this file 
   (`KAFKA_HEAP_OPTS=-Xms256m -Xmx512m`); mysql 512m (`--innodb-buffer-pool-size=64M --performance-schema=OFF`);
   mongo 384m (`--wiredTigerCacheSizeGB 0.25`); postgres 256m each; nginx 64m; observability only under profile.
   Build with `COMPOSE_PARALLEL_LIMIT=2`. v2 measured total ≈ 2.28 GiB, application-service 312/384 MiB (81%), no OOM.
+  v3: application-service raised to **512m** (user approved more resources; was 344/384 = 89.6%) → 343/512 (67%).
 - Git: initialised on `main` after v2; commit per sub-phase (conventional commits); never push.
 
 ## 3. Commands (Git Bash, repo root unless noted)
@@ -100,7 +101,8 @@ Phase 9 (v3, BUILD_SPEC §20):
 Definition of Done (v2 §17): all [x] (see git history of this file). Frontend click-through gap closes with Playwright.
 
 ## 5. Current state
-- Phase 9 (v3) complete and committed. application-service memory headroom is the item to watch (89.6%).
+- Phase 9 (v3) complete and committed. Post-review: application-service mem 512m; logs clean (only startup
+  Kafka coordinator rebalances and the intended example-secret WARNs).
 
 ## 6. Known issues / deviations from spec
 - Java 25 instead of 21 (user edit). VS Code redhat.java may race on `target/` → rerun `./mvnw clean verify`.

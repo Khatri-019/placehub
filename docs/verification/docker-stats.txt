@@ -1,12 +1,12 @@
-placehub-lite-frontend-1	11.39MiB / 64MiB	17.80%	0.00%
-placehub-lite-notification-service-1	235.4MiB / 384MiB	61.29%	0.64%
-placehub-lite-user-service-1	275.8MiB / 384MiB	71.83%	0.04%
-placehub-lite-application-service-1	344.1MiB / 384MiB	89.62%	0.27%
-placehub-lite-job-service-1	278.9MiB / 384MiB	72.63%	0.03%
-placehub-lite-api-gateway-1	200.9MiB / 384MiB	52.32%	0.07%
-placehub-lite-users-db-1	44.53MiB / 256MiB	17.39%	0.00%
-placehub-lite-notifications-db-1	176.2MiB / 384MiB	45.89%	72.23%
-placehub-lite-applications-db-1	46.85MiB / 256MiB	18.30%	0.06%
-placehub-lite-kafka-1	422.5MiB / 768MiB	55.01%	174.43%
-placehub-lite-jobs-db-1	201MiB / 512MiB	39.26%	5.08%
-placehub-lite-discovery-server-1	195.7MiB / 384MiB	50.96%	2.28%
+placehub-lite-api-gateway-1	205.7MiB / 384MiB	53.57%
+placehub-lite-application-service-1	342.7MiB / 512MiB	66.93%
+placehub-lite-applications-db-1	49.29MiB / 256MiB	19.25%
+placehub-lite-discovery-server-1	202MiB / 384MiB	52.61%
+placehub-lite-frontend-1	12.74MiB / 64MiB	19.90%
+placehub-lite-job-service-1	286.4MiB / 384MiB	74.59%
+placehub-lite-jobs-db-1	212.3MiB / 512MiB	41.46%
+placehub-lite-kafka-1	381.2MiB / 768MiB	49.64%
+placehub-lite-notification-service-1	243.6MiB / 384MiB	63.43%
+placehub-lite-notifications-db-1	174.7MiB / 384MiB	45.49%
+placehub-lite-user-service-1	290.1MiB / 384MiB	75.53%
+placehub-lite-users-db-1	47.99MiB / 256MiB	18.75%

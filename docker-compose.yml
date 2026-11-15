@@ -200,6 +200,9 @@ services:
 
   application-service:
     <<: *jvm-service
+    # Raised from 384m (v3 measured 344/384 MiB = 89.6% after the full test load; it has the most code paths:
+    # policy engine, consents, history, outbox). Heap stays MaxRAMPercentage=70 of the limit.
+    mem_limit: 512m
     build:
       <<: *jvm-build
       args: { MODULE: application-service }
