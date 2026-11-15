@@ -1,0 +1,16 @@
+# Dev profile: localhost host-port defaults for running outside Docker. No seed data: the demo starts clean.
+spring:
+  datasource:
+    url: ${APPLICATIONS_DB_URL:jdbc:postgresql://localhost:5434/placehub_applications}
+    username: ${APPLICATIONS_DB_USER:placehub_applications}
+    password: ${APPLICATIONS_DB_PASSWORD:applications_pw}
+
+placehub:
+  security:
+    jwt-secret: ${JWT_SECRET:change-me-local-dev-secret-at-least-32-bytes!!}
+    internal-token: ${INTERNAL_SERVICE_TOKEN:change-me-local-internal-token}
+
+management:
+  endpoint:
+    health:
+      show-details: always

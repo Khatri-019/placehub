@@ -1,0 +1,62 @@
+server:
+  port: 8082
+  error:
+    include-stacktrace: never
+    include-message: never
+
+spring:
+  application:
+    name: job-service
+  datasource:
+    url: ${JOBS_DB_URL}
+    username: ${JOBS_DB_USER}
+    password: ${JOBS_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        type:
+          preferred_uuid_jdbc_type: CHAR
+          preferred_instant_jdbc_type: TIMESTAMP
+        default_batch_fetch_size: 50
+  flyway:
+    locations: classpath:db/migration
+
+placehub:
+  security:
+    jwt-secret: ${JWT_SECRET:}
+    internal-token: ${INTERNAL_SERVICE_TOKEN:}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+    registry-fetch-interval-seconds: 5
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 15
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name},%X{correlationId:-}]"

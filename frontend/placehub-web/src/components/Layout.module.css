@@ -1,0 +1,162 @@
+.shell {
+  min-height: 100vh;
+  display: flex;
+}
+
+.sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--color-sidebar);
+  color: var(--color-sidebar-text);
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-5) var(--space-3);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.brand {
+  font-weight: 700;
+  font-size: var(--font-size-lg);
+  padding: 0 var(--space-3) var(--space-5);
+  letter-spacing: -0.01em;
+}
+
+.brand span {
+  color: var(--color-accent);
+}
+
+.navList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.navLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--color-sidebar-text);
+  text-decoration: none;
+  font-size: var(--font-size-sm);
+}
+
+.navLink:hover {
+  background: var(--color-sidebar-hover);
+}
+
+.active {
+  background: var(--color-sidebar-active);
+  color: #fff;
+  font-weight: 600;
+}
+
+.unread {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: #111;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-align: center;
+}
+
+.userBox {
+  margin-top: auto;
+  padding: var(--space-3);
+  border-top: 1px solid var(--color-sidebar-hover);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.userName {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+}
+
+.userRole {
+  font-size: var(--font-size-xs);
+  text-transform: capitalize;
+  opacity: 0.75;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  display: none;
+}
+
+.content {
+  padding: var(--space-6);
+  max-width: 1200px;
+  width: 100%;
+}
+
+.menuButton {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 1.4rem;
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+}
+
+.backdrop {
+  display: none;
+}
+
+@media (max-width: 959px) {
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgb(0 0 0 / 40%);
+    z-index: 40;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-sidebar);
+    color: var(--color-sidebar-text);
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+
+  .topbar .brand {
+    padding: 0;
+  }
+
+  .content {
+    padding: var(--space-4);
+  }
+}

@@ -1,0 +1,19 @@
+# Dev profile: seed data + localhost host-port defaults for running outside Docker.
+# Inside compose the environment variables override these defaults.
+spring:
+  datasource:
+    url: ${JOBS_DB_URL:jdbc:mysql://localhost:3307/placehub_jobs?allowPublicKeyRetrieval=true&useSSL=false}
+    username: ${JOBS_DB_USER:placehub_jobs}
+    password: ${JOBS_DB_PASSWORD:jobs_pw}
+  flyway:
+    locations: classpath:db/migration,classpath:db/seed-dev
+
+placehub:
+  security:
+    jwt-secret: ${JWT_SECRET:change-me-local-dev-secret-at-least-32-bytes!!}
+    internal-token: ${INTERNAL_SERVICE_TOKEN:change-me-local-internal-token}
+
+management:
+  endpoint:
+    health:
+      show-details: always

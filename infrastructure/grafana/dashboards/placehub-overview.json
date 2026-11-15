@@ -1,0 +1,72 @@
+{
+  "uid": "placehub-overview",
+  "title": "PlaceHub Lite - JVM and HTTP",
+  "schemaVersion": 39,
+  "version": 1,
+  "time": { "from": "now-30m", "to": "now" },
+  "refresh": "15s",
+  "tags": ["placehub"],
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "HTTP request rate per service (req/s)",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "placehub-prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "sum by (service) (rate(http_server_requests_seconds_count[1m]))", "legendFormat": "{{service}}" }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "HTTP 5xx rate per service (req/s)",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "placehub-prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "sum by (service) (rate(http_server_requests_seconds_count{status=~\"5..\"}[1m]))", "legendFormat": "{{service}}" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "HTTP max latency per service (s)",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "placehub-prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "max by (service) (http_server_requests_seconds_max)", "legendFormat": "{{service}} max" }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "JVM heap used per service (bytes)",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "placehub-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "bytes" } },
+      "targets": [
+        { "refId": "A", "expr": "sum by (service) (jvm_memory_used_bytes{area=\"heap\"})", "legendFormat": "{{service}}" }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "JVM live threads",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "placehub-prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "sum by (service) (jvm_threads_live_threads)", "legendFormat": "{{service}}" }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "GC pause time rate (s/s)",
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "placehub-prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "sum by (service) (rate(jvm_gc_pause_seconds_sum[1m]))", "legendFormat": "{{service}}" }
+      ]
+    }
+  ]
+}

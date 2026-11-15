@@ -1,0 +1,289 @@
+# PlaceHub Lite - full local stack.
+#   cp .env.example .env
+#   COMPOSE_PARALLEL_LIMIT=2 docker compose up --build
+# Memory budget (Docker capped at 8 GB): 6 JVMs x 384m + kafka 768m + mysql 512m + mongo 384m + 2 x postgres 256m
+# + nginx 64m ~= 4.5 GB. Observability (prometheus/grafana) only with --profile observability.
+name: placehub-lite
+
+x-jvm-env: &jvm-env
+  SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+  EUREKA_URL: ${EUREKA_URL:-http://discovery-server:8761/eureka}
+  JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=70 -XX:+UseSerialGC -Xss512k -XX:TieredStopAtLevel=1"
+
+x-jvm-service: &jvm-service
+  mem_limit: 384m
+  build: &jvm-build
+    context: ./backend
+    dockerfile: Dockerfile
+
+x-healthcheck-timing: &hc-timing
+  interval: 10s
+  timeout: 5s
+  retries: 18
+  start_period: 60s
+
+services:
+  # ------------------------------------------------------------------ infrastructure
+  users-db:
+    image: postgres:17
+    mem_limit: 256m
+    command: ["postgres", "-c", "shared_buffers=64MB", "-c", "max_connections=40"]
+    environment:
+      POSTGRES_DB: placehub_users
+      POSTGRES_USER: ${USERS_DB_USER:?set USERS_DB_USER in .env}
+      POSTGRES_PASSWORD: ${USERS_DB_PASSWORD:?set USERS_DB_PASSWORD in .env}
+    ports: ["5433:5432"]
+    volumes: [users-db-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  applications-db:
+    image: postgres:17
+    mem_limit: 256m
+    command: ["postgres", "-c", "shared_buffers=64MB", "-c", "max_connections=40"]
+    environment:
+      POSTGRES_DB: placehub_applications
+      POSTGRES_USER: ${APPLICATIONS_DB_USER:?set APPLICATIONS_DB_USER in .env}
+      POSTGRES_PASSWORD: ${APPLICATIONS_DB_PASSWORD:?set APPLICATIONS_DB_PASSWORD in .env}
+    ports: ["5434:5432"]
+    volumes: [applications-db-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  jobs-db:
+    image: mysql:8.4
+    mem_limit: 512m
+    command: ["--innodb-buffer-pool-size=64M", "--performance-schema=OFF"]
+    environment:
+      MYSQL_DATABASE: placehub_jobs
+      MYSQL_USER: ${JOBS_DB_USER:?set JOBS_DB_USER in .env}
+      MYSQL_PASSWORD: ${JOBS_DB_PASSWORD:?set JOBS_DB_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${JOBS_DB_ROOT_PASSWORD:?set JOBS_DB_ROOT_PASSWORD in .env}
+    ports: ["3307:3306"]
+    volumes: [jobs-db-data:/var/lib/mysql]
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 30s
+
+  notifications-db:
+    image: mongo:8
+    mem_limit: 384m
+    command: ["--wiredTigerCacheSizeGB", "0.25"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${NOTIFICATIONS_MONGO_USER:?set NOTIFICATIONS_MONGO_USER in .env}
+      MONGO_INITDB_ROOT_PASSWORD: ${NOTIFICATIONS_MONGO_PASSWORD:?set NOTIFICATIONS_MONGO_PASSWORD in .env}
+      MONGO_INITDB_DATABASE: placehub_notifications
+    ports: ["27018:27017"]
+    volumes: [notifications-db-data:/data/db]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 20s
+
+  kafka:
+    image: apache/kafka:4.3.2
+    mem_limit: 768m
+    environment:
+      KAFKA_HEAP_OPTS: "-Xms256m -Xmx512m"
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      CLUSTER_ID: "pLaCeHuBLiTeKRaFt0001A"
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    ports: ["29092:29092"]
+    volumes: [kafka-data:/var/lib/kafka/data]
+    healthcheck:
+      # Small heap for the CLI JVM so it fits next to the broker inside the 768m limit.
+      test: ["CMD-SHELL", "KAFKA_HEAP_OPTS=-Xmx64m /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 20s
+      retries: 20
+      start_period: 20s
+
+  # ------------------------------------------------------------------ platform
+  discovery-server:
+    <<: *jvm-service
+    build:
+      <<: *jvm-build
+      args: { MODULE: discovery-server }
+    image: placehub/discovery-server:local
+    environment:
+      <<: *jvm-env
+      EUREKA_HOSTNAME: discovery-server
+    ports: ["8761:8761"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8761/actuator/health || exit 1"]
+      <<: *hc-timing
+
+  api-gateway:
+    <<: *jvm-service
+    build:
+      <<: *jvm-build
+      args: { MODULE: api-gateway }
+    image: placehub/api-gateway:local
+    environment:
+      <<: *jvm-env
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5173}
+    ports: ["8080:8080"]
+    depends_on:
+      discovery-server: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      <<: *hc-timing
+
+  # ------------------------------------------------------------------ business services
+  user-service:
+    <<: *jvm-service
+    build:
+      <<: *jvm-build
+      args: { MODULE: user-service }
+    image: placehub/user-service:local
+    environment:
+      <<: *jvm-env
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      JWT_TTL_MINUTES: ${JWT_TTL_MINUTES:-60}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?set INTERNAL_SERVICE_TOKEN in .env}
+      USERS_DB_URL: ${USERS_DB_URL:?set USERS_DB_URL in .env}
+      USERS_DB_USER: ${USERS_DB_USER}
+      USERS_DB_PASSWORD: ${USERS_DB_PASSWORD}
+    ports: ["8081:8081"]
+    depends_on:
+      users-db: { condition: service_healthy }
+      discovery-server: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/actuator/health || exit 1"]
+      <<: *hc-timing
+
+  job-service:
+    <<: *jvm-service
+    build:
+      <<: *jvm-build
+      args: { MODULE: job-service }
+    image: placehub/job-service:local
+    environment:
+      <<: *jvm-env
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?set INTERNAL_SERVICE_TOKEN in .env}
+      JOBS_DB_URL: ${JOBS_DB_URL:?set JOBS_DB_URL in .env}
+      JOBS_DB_USER: ${JOBS_DB_USER}
+      JOBS_DB_PASSWORD: ${JOBS_DB_PASSWORD}
+    ports: ["8082:8082"]
+    depends_on:
+      jobs-db: { condition: service_healthy }
+      discovery-server: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8082/actuator/health || exit 1"]
+      <<: *hc-timing
+
+  application-service:
+    <<: *jvm-service
+    build:
+      <<: *jvm-build
+      args: { MODULE: application-service }
+    image: placehub/application-service:local
+    environment:
+      <<: *jvm-env
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?set INTERNAL_SERVICE_TOKEN in .env}
+      APPLICATIONS_DB_URL: ${APPLICATIONS_DB_URL:?set APPLICATIONS_DB_URL in .env}
+      APPLICATIONS_DB_USER: ${APPLICATIONS_DB_USER}
+      APPLICATIONS_DB_PASSWORD: ${APPLICATIONS_DB_PASSWORD}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+    ports: ["8083:8083"]
+    depends_on:
+      applications-db: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      discovery-server: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8083/actuator/health || exit 1"]
+      <<: *hc-timing
+
+  notification-service:
+    <<: *jvm-service
+    build:
+      <<: *jvm-build
+      args: { MODULE: notification-service }
+    image: placehub/notification-service:local
+    environment:
+      <<: *jvm-env
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      NOTIFICATIONS_MONGO_URI: ${NOTIFICATIONS_MONGO_URI:?set NOTIFICATIONS_MONGO_URI in .env}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+    ports: ["8084:8084"]
+    depends_on:
+      notifications-db: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      discovery-server: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8084/actuator/health || exit 1"]
+      <<: *hc-timing
+
+  # ------------------------------------------------------------------ frontend
+  frontend:
+    build:
+      context: ./frontend/placehub-web
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
+    image: placehub/frontend:local
+    mem_limit: 64m
+    ports: ["5173:80"]
+    depends_on:
+      api-gateway: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ------------------------------------------------------------------ observability (opt-in)
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    profiles: ["observability"]
+    mem_limit: 256m
+    volumes:
+      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports: ["9090:9090"]
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    profiles: ["observability"]
+    mem_limit: 256m
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infrastructure/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["3000:3000"]
+    depends_on: [prometheus]
+
+volumes:
+  users-db-data:
+  jobs-db-data:
+  applications-db-data:
+  notifications-db-data:
+  kafka-data:

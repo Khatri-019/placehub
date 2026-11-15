@@ -1,0 +1,55 @@
+/* Design tokens: the single source of colours, spacing, radii and type for PlaceHub Lite. */
+:root {
+  --color-bg: #f5f6fa;
+  --color-surface: #ffffff;
+  --color-border: #dfe3ec;
+  --color-text: #1c2333;
+  --color-muted: #5f6b80;
+  --color-primary: #2f5bd3;
+  --color-primary-hover: #2549ac;
+  --color-primary-soft: #eaf0fe;
+  --color-accent: #f5b83d;
+  --color-success: #1f8a4c;
+  --color-success-soft: #e8f6ee;
+  --color-danger: #c23b3b;
+  --color-danger-hover: #a12f2f;
+  --color-danger-soft: #fdecec;
+  --color-warning: #b7791f;
+  --color-warning-soft: #fff6e5;
+  --color-focus: #f5b83d;
+
+  --color-sidebar: #18213a;
+  --color-sidebar-text: #d7dcea;
+  --color-sidebar-hover: #253154;
+  --color-sidebar-active: #2f5bd3;
+
+  --badge-neutral-bg: #eceff4; --badge-neutral-fg: #4a5468;
+  --badge-blue-bg: #e3ecff; --badge-blue-fg: #2346a6;
+  --badge-amber-bg: #fff1d6; --badge-amber-fg: #8a5a00;
+  --badge-violet-bg: #efe7ff; --badge-violet-fg: #5b34b3;
+  --badge-green-bg: #dff4e7; --badge-green-fg: #176b3a;
+  --badge-red-bg: #fde3e3; --badge-red-fg: #9c2a2a;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  --font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.25rem;
+  --font-size-xl: 1.6rem;
+  --font-size-xxl: 2.25rem;
+
+  --shadow-sm: 0 1px 2px rgb(16 24 40 / 6%);
+  --shadow-md: 0 6px 18px rgb(16 24 40 / 12%);
+}

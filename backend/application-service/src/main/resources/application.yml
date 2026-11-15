@@ -1,0 +1,80 @@
+server:
+  port: 8083
+  error:
+    include-stacktrace: never
+    include-message: never
+
+spring:
+  application:
+    name: application-service
+  datasource:
+    url: ${APPLICATIONS_DB_URL}
+    username: ${APPLICATIONS_DB_USER}
+    password: ${APPLICATIONS_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 6
+      minimum-idle: 1
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    locations: classpath:db/migration
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+        max.block.ms: 5000
+        request.timeout.ms: 4000
+        delivery.timeout.ms: 5000
+        linger.ms: 0
+  cloud:
+    openfeign:
+      client:
+        config:
+          user-service:
+            connect-timeout: 2000
+            read-timeout: 3000
+          job-service:
+            connect-timeout: 2000
+            read-timeout: 3000
+
+placehub:
+  security:
+    jwt-secret: ${JWT_SECRET:}
+    internal-token: ${INTERNAL_SERVICE_TOKEN:}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+    registry-fetch-interval-seconds: 5
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 15
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name},%X{correlationId:-}]"

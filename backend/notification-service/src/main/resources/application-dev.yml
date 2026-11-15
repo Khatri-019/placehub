@@ -1,0 +1,13 @@
+# Dev profile: localhost host-port defaults for running outside Docker. No seed data (notifications come from events).
+spring:
+  mongodb:
+    uri: ${NOTIFICATIONS_MONGO_URI:mongodb://placehub_notifications:notif_pw@localhost:27018/placehub_notifications?authSource=admin}
+
+placehub:
+  security:
+    jwt-secret: ${JWT_SECRET:change-me-local-dev-secret-at-least-32-bytes!!}
+
+management:
+  endpoint:
+    health:
+      show-details: always

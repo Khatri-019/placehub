@@ -1,0 +1,21 @@
+# Scrapes every Spring Boot app's /actuator/prometheus inside the compose network.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: placehub
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['discovery-server:8761']
+        labels: { service: discovery-server }
+      - targets: ['api-gateway:8080']
+        labels: { service: api-gateway }
+      - targets: ['user-service:8081']
+        labels: { service: user-service }
+      - targets: ['job-service:8082']
+        labels: { service: job-service }
+      - targets: ['application-service:8083']
+        labels: { service: application-service }
+      - targets: ['notification-service:8084']
+        labels: { service: notification-service }

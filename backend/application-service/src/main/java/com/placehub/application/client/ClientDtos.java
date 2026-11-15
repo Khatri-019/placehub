@@ -1,0 +1,31 @@
+package com.placehub.application.client;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+/** This service's own copies of the internal contracts it consumes (never shared jars). */
+public final class ClientDtos {
+
+    private ClientDtos() {
+    }
+
+    /** User Service GET /internal/users/{id}/academic-profile. */
+    public record AcademicProfile(UUID userId, String fullName, String email, String branch, int graduationYear,
+                                  BigDecimal cgpa, int backlogCount, String status) {
+    }
+
+    /** Job Service POST /internal/jobs/{id}/validate-eligibility request. */
+    public record EligibilityCheck(String branch, int graduationYear, BigDecimal cgpa, int backlogCount) {
+    }
+
+    /** Job Service POST /internal/jobs/{id}/validate-eligibility response (always 200 for an existing job). */
+    public record EligibilityResult(UUID jobId, boolean eligible, List<String> reasons) {
+    }
+
+    /** Job Service GET /internal/jobs/{id}/summary. */
+    public record JobSummary(UUID jobId, String title, UUID companyId, String companyName, UUID recruiterOwnerUserId,
+                             String status, Instant deadline) {
+    }
+}

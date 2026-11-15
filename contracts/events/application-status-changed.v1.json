@@ -1,0 +1,16 @@
+{
+  "eventId": "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+  "eventType": "APPLICATION_STATUS_CHANGED",
+  "eventVersion": 1,
+  "occurredAt": "2026-01-01T11:00:00Z",
+  "applicationId": "5b0d1e7a-3c2f-4e8b-a9d6-1f2e3d4c5b6a",
+  "jobId": "20000000-0000-0000-0000-000000000001",
+  "studentUserId": "00000000-0000-0000-0000-000000000003",
+  "studentName": "Demo Student",
+  "recruiterUserId": "00000000-0000-0000-0000-000000000002",
+  "jobTitle": "Graduate Software Engineer",
+  "companyName": "Northstar Technologies",
+  "oldStatus": "APPLIED",
+  "newStatus": "SHORTLISTED",
+  "changedByUserId": "00000000-0000-0000-0000-000000000002"
+}
