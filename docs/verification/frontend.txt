@@ -1,0 +1,39 @@
+== npm ci
+
+added 299 packages in 18s
+== lint
+> eslint . --max-warnings 0
+
+== test
+ Test Files  5 passed (5)
+      Tests  33 passed (33)
+== build
+computing gzip size...
+dist/index.html                           0.95 kB │ gzip:   0.55 kB
+dist/assets/admin-DCE6p78R.css            0.62 kB │ gzip:   0.31 kB
+dist/assets/Notifications-B1UkJCA-.css    0.70 kB │ gzip:   0.35 kB
+dist/assets/openBlob-BwWiZ45h.css         1.96 kB │ gzip:   0.65 kB
+dist/assets/Card-DnLDI2th.css             3.97 kB │ gzip:   1.20 kB
+dist/assets/student-CrVvo26B.css          5.88 kB │ gzip:   1.67 kB
+dist/assets/index-ByIz75za.css           28.34 kB │ gzip:   6.10 kB
+dist/assets/plus-WgDQuPEo.js              0.15 kB │ gzip:   0.15 kB
+dist/assets/Field-DNIP9Drc.js             0.47 kB │ gzip:   0.30 kB
+dist/assets/Markdown-DBVjhUEl.js          1.06 kB │ gzip:   0.57 kB
+dist/assets/openBlob-vRcZ0RxL.js          2.36 kB │ gzip:   1.22 kB
+dist/assets/Notifications-CEjZ2zeJ.js     2.94 kB │ gzip:   1.40 kB
+dist/assets/useAsync-CkFN5_P-.js          3.03 kB │ gzip:   1.38 kB
+dist/assets/Card-BRmZeDia.js              6.91 kB │ gzip:   2.74 kB
+dist/assets/register-BcyYl7Q9.js          6.94 kB │ gzip:   1.96 kB
+dist/assets/recruiter-Sg2_URi4.js        26.26 kB │ gzip:   7.57 kB
+dist/assets/student-CUwKUWow.js          27.93 kB │ gzip:   8.83 kB
+dist/assets/admin-BrSzQOf_.js            35.53 kB │ gzip:   9.58 kB
+dist/assets/index-Db9dpZV8.js           321.04 kB │ gzip: 105.59 kB
+✓ built in 4.28s
+== size
+PASS  initial (landing/login)     109.4 KB / 120.0 KB
+PASS  student chunk (+shared)      16.0 KB / 80.0 KB
+PASS  recruiter chunk (+shared)    13.0 KB / 80.0 KB
+PASS  admin chunk (+shared)        14.3 KB / 80.0 KB
+INFO  preloaded font fonts/inter-latin-var.woff2: 47.1 KB (woff2, already compressed; not in the JS/CSS budget)
+== e2e
+  24 passed (35.1s)

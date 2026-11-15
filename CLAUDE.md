@@ -91,15 +91,16 @@ Phase 9 (v3, BUILD_SPEC §20):
       CTC/type fixed after publish, F8 advisory-lock consent recount, F9 /api/admin/** URL rule. Accepted: F4 (smoke
       requires 403), dup-email 409, CSP/RS256 as hardening. Proof: gateway 13, user 29+10 IT, job 25+3 IT, app 147+9
       IT; smoke 64/64 (35 v2 + 29 v3); Playwright 24/24
-- [ ] 9.8 Tests, smoke, Playwright, screenshots, docs, clean final verification
+- [x] 9.8 Final — clean `down -v` + `cp .env.example .env` + `up --build`: 12/12 healthy in 23 s; smoke 64/64; npm ci,
+      lint 0, vitest 33, build, size 109.4/16.0/13.0/14.3 KB; Playwright 24/24; `./mvnw clean verify` 263 tests
+      (238 unit + 25 IT), 0 skipped; Lighthouse landing 99/100/100/100, login 100/100/100/100, student jobs 95/100/
+      100/100, recruiter applicants 96/100/100/100, CLS ≤ 0.021; docker stats ≈ 2.4 GiB, app-service 344/384 MiB
+      (89.6%, below the 90% raise rule; no OOM, 0 restarts). Outputs in docs/verification/
 
 Definition of Done (v2 §17): all [x] (see git history of this file). Frontend click-through gap closes with Playwright.
 
 ## 5. Current state
-- 9.7 done and committed. Next: 9.8 docs polish + clean final verification (down -v, up --build, smoke, frontend
-  ci/lint/test/build/size/e2e, ./mvnw clean verify, Lighthouse, docker stats) and the final report. Smoke v3 + e2e
-  v3/a11y specs and README v3 sections already written. Lighthouse: `cd scripts/lighthouse && npm install && node
-  flow.mjs <chrome> report.html`.
+- Phase 9 (v3) complete and committed. application-service memory headroom is the item to watch (89.6%).
 
 ## 6. Known issues / deviations from spec
 - Java 25 instead of 21 (user edit). VS Code redhat.java may race on `target/` → rerun `./mvnw clean verify`.

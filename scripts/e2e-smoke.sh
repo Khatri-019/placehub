@@ -299,8 +299,9 @@ req GET /api/admin/policy "$ADMIN_TOKEN"
 ORIGINAL_POLICY="$(echo "$BODY" | jq -c '{bands, appliesToInternships, maxActiveConsents, resumeRequired,
   withdrawOtherApplicationsOnLock, consentText}')"
 ORIGINAL_VERSION="$(json '.version')"
-[ "$(json '[.bands[] | "\(.fromMultiplier)-\(.toMultiplier)-\(.action)-\(.lockOnPlacement)"] | join(" ")')" \
-  = "0-1.5-BLOCK-false 1.5-2-REQUIRE_CONSENT-true 2-null-ALLOW-false" ] \
+# Compared numerically: a seeded version serialises 2.0, a re-saved one 2.
+[ "$(json '[.bands[] | "\(.fromMultiplier * 100 | round)-\(if .toMultiplier == null then "inf" else (.toMultiplier * 100 | round) end)-\(.action)-\(.lockOnPlacement)"] | join(" ")')" \
+  = "0-150-BLOCK-false 150-200-REQUIRE_CONSENT-true 200-inf-ALLOW-false" ] \
   && pass "active policy v$ORIGINAL_VERSION has the seeded bands" \
   || fail "active policy bands differ from the seeded v1; later expectations may not hold" "$(json '.bands' | tr -d '\n ')"
 PLACED_EMAIL="smoke.placed.$RUN_ID@example.com"

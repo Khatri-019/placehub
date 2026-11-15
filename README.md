@@ -284,12 +284,23 @@ Emails are simulated by `ConsoleEmailSender`, which logs `[SIMULATED EMAIL]` lin
   can't be probed.
 - **Passwords** are hashed with BCrypt (strength 10). Hashes are never returned or logged, and request DTOs mask
   passwords in `toString`.
+- **Deactivation is enforced on live tokens** (v3): the gateway checks each authenticated user's status through the
+  User Service (cached 15 s) and answers 401 "Your account is deactivated".
+- **Sign-in throttling** (v3): 10 failed sign-ins for one email within 15 minutes → 429 until the window ends.
+  Unknown emails are counted the same way.
+- **Admin paths** (`/api/admin/**`) require ADMIN in every service's filter chain, before request bodies are read.
+- **Ports:** only the gateway (8080) and the frontend (5173) listen on all interfaces. Service debug ports,
+  databases, Kafka, Eureka and observability are bound to `127.0.0.1`. Services log a warning while the example
+  secrets from `.env.example` are in use.
+- **Consent records** store the client IP the gateway saw. The gateway attests forwarded requests with
+  `X-Gateway-Token`, so a direct caller cannot forge `X-Forwarded-For`.
+
+An independent security review of the v3 permission matrix and its fixes is summarised in `IMPLEMENTATION_NOTES.md`.
 
 **Known limitations (by design in v1):**
 
-- A deactivated user's existing token stays valid until it expires (at most 60 minutes). Deactivation takes effect
-  at the next login. Application Service also refuses to create applications for non-`ACTIVE` students through the
-  academic-profile check.
+- If the User Service is unreachable, the gateway lets authenticated requests through (it fails open), so a
+  deactivation applies again once the User Service is back. Sign-in itself needs the User Service.
 - Tokens use a shared symmetric key, there are no refresh tokens, and the frontend keeps the token in
   `sessionStorage`.
 
@@ -354,10 +365,11 @@ Seed data is reapplied on the next start.
 ## 12. Known limitations and production hardening
 
 - RS256 signing with a JWKS endpoint and key rotation, instead of a shared HS256 secret.
-- Refresh tokens and token revocation (a deactivation currently waits for token expiry).
+- Refresh tokens and per-token revocation (deactivation is enforced by a status lookup at the gateway).
 - mTLS or OAuth2 client-credentials for service-to-service calls, instead of a shared internal token.
 - HttpOnly secure cookies, instead of `sessionStorage`, for the browser token.
-- Login rate limiting (skipped: the gateway's `RequestRateLimiter` needs Redis).
+- Distributed rate limiting (the sign-in throttle is in memory, per User Service instance) and a Content-Security-Policy
+  bound to the deployed API origin.
 - A recruiter approval flow: the schema and the `placehub.recruiter.auto-approve` flag already support
   `PENDING_APPROVAL`.
 - Re-applying after withdrawal: blocked in v1 by the unique `(job_id, student_user_id)` constraint.

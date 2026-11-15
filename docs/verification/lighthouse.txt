@@ -1,0 +1,5 @@
+page | perf | a11y | best-practices | seo | CLS | LCP ms
+Landing | 99 | 100 | 100 | 100 | 0.000 | 1860
+Login (student) | 100 | 100 | 100 | 100 | 0.000 | 666
+Student jobs | 95 | 100 | 100 | 100 | 0.021 | 1037
+Recruiter applicants | 96 | 100 | 100 | 100 | 0.018 | 1063

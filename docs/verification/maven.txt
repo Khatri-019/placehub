@@ -1,0 +1,21 @@
+Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 13, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 29, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 10, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 25, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 3, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 147, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 9, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 18, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 2, Failures: 0, Errors: 0, Skipped: 0
+Reactor Summary for PlaceHub Lite (parent) 1.0.0:
+PlaceHub Lite (parent) ............................. SUCCESS [  0.739 s]
+placehub-common .................................... SUCCESS [  7.398 s]
+discovery-server ................................... SUCCESS [ 13.172 s]
+api-gateway ........................................ SUCCESS [ 13.118 s]
+user-service ....................................... SUCCESS [ 36.149 s]
+job-service ........................................ SUCCESS [ 42.457 s]
+application-service ................................ SUCCESS [01:47 min]
+notification-service ............................... SUCCESS [ 24.788 s]
+BUILD SUCCESS
