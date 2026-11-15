@@ -94,6 +94,10 @@ public class AuthService {
         if (!passwordEncoder.matches(req.password(), user.getPasswordHash())) {
             throw ApiException.unauthorized(BAD_CREDENTIALS);
         }
+        // Only reached with valid credentials, so the role is never revealed to someone without the password.
+        if (req.portal() != null && req.portal() != user.getRole()) {
+            throw ApiException.forbidden(portalMismatch(req.portal(), user.getRole()));
+        }
         switch (user.getAccountStatus()) {
             case DEACTIVATED -> throw ApiException.forbidden(DEACTIVATED);
             case PENDING_APPROVAL -> throw ApiException.forbidden(PENDING);
@@ -103,6 +107,19 @@ public class AuthService {
         UserResponse dto = UserMapper.toResponse(user, students.findById(user.getId()).orElse(null),
                 recruiters.findById(user.getId()).orElse(null));
         return new LoginResponse(token.value(), "Bearer", token.expiresInSeconds(), dto);
+    }
+
+    static String portalMismatch(Role portal, Role actual) {
+        return "This account is not registered as a " + portalName(portal) + ". Use the " + portalName(actual)
+                + " login.";
+    }
+
+    private static String portalName(Role role) {
+        return switch (role) {
+            case STUDENT -> "student";
+            case RECRUITER -> "recruiter";
+            case ADMIN -> "placement office";
+        };
     }
 
     private void ensureEmailFree(String email) {

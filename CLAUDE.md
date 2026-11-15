@@ -71,7 +71,9 @@ Phase 9 (v3, BUILD_SPEC §20):
       bulk per-item with foreign → NOT_FOUND, auto-screen ownership/mode, history visibility); PolicyFlowIT +1
       (CREATED then STATUS_CHANGED SYSTEM by seq, both SENT, 2-row history, manual reject, foreign 404);
       app+notif verify 178; smoke 35/35; Playwright 10/10
-- [ ] 9.5 Separate login portals (backend portal check + UI routes)
+- [~] 9.5 Login portals — backend done: AuthServiceTest +2 (mismatch 403 naming the right login, wrong password
+      still 401 for mismatched/unknown), UserServiceIT +1 (403/401/200/400 via MockMvc); user verify 41.
+      Portal routes/pages ship with 9.6
 - [ ] 9.6 UI redesign (tokens, components, lazy routes, size budget, Lighthouse, dark theme)
 - [ ] 9.7 Security review (fresh subagent) + test-first fixes
 - [ ] 9.8 Tests, smoke, Playwright, screenshots, docs, clean final verification
@@ -79,7 +81,7 @@ Phase 9 (v3, BUILD_SPEC §20):
 Definition of Done (v2 §17): all [x] (see git history of this file). Frontend click-through gap closes with Playwright.
 
 ## 5. Current state
-- Phase 9.5 (portal login backend + routes) next. Stack running with 9.4 images. Frontend for 9.3-9.5 is built in 9.6.
+- Phase 9.6 (UI redesign incl. 9.3-9.5 UI) in progress. Stack running with 9.4 images (user-service 9.5 not yet rebuilt).
 
 ## 6. Known issues / deviations from spec
 - Java 25 instead of 21 (user edit). VS Code redhat.java may race on `target/` → rerun `./mvnw clean verify`.

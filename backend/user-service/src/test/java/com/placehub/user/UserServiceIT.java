@@ -106,6 +106,24 @@ class UserServiceIT {
     }
 
     @Test
+    void portalLoginRejectsOtherRolesOnlyWithValidCredentials() throws Exception {
+        mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"student@placehub.local\",\"password\":\"PlaceHub@123\",\"portal\":\"RECRUITER\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("This account is not registered as a recruiter. Use the student login."));
+        mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"student@placehub.local\",\"password\":\"nope12345\",\"portal\":\"RECRUITER\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Invalid email or password"));
+        mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"admin@placehub.local\",\"password\":\"PlaceHub@123\",\"portal\":\"ADMIN\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"admin@placehub.local\",\"password\":\"PlaceHub@123\",\"portal\":\"SUPERUSER\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void wrongPasswordIs401AndMeWithoutTokenIs401() throws Exception {
         mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"student@placehub.local\",\"password\":\"Nope12345\"}"))

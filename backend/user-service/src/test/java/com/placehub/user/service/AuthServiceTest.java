@@ -154,6 +154,30 @@ class AuthServiceTest {
     }
 
     @Test
+    void portalMismatchWithCorrectPasswordIs403NamingTheRightLogin() {
+        existing(AccountStatus.ACTIVE);
+        assertThatThrownBy(() -> service.login(new LoginRequest("asha@example.com", "Secret123", Role.RECRUITER)))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("This account is not registered as a recruiter. Use the student login.")
+                .satisfies(e -> assertThat(((ApiException) e).getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
+        assertThatThrownBy(() -> service.login(new LoginRequest("asha@example.com", "Secret123", Role.ADMIN)))
+                .hasMessage("This account is not registered as a placement office. Use the student login.");
+        assertThat(service.login(new LoginRequest("asha@example.com", "Secret123", Role.STUDENT)).tokenType())
+                .isEqualTo("Bearer");
+    }
+
+    @Test
+    void portalMismatchWithWrongPasswordIsStillTheGeneric401() {
+        existing(AccountStatus.ACTIVE);
+        assertThatThrownBy(() -> service.login(new LoginRequest("asha@example.com", "Wrong1234", Role.RECRUITER)))
+                .hasMessage(AuthService.BAD_CREDENTIALS)
+                .satisfies(e -> assertThat(((ApiException) e).getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED));
+        when(users.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.login(new LoginRequest("ghost@example.com", "Secret123", Role.ADMIN)))
+                .hasMessage(AuthService.BAD_CREDENTIALS);
+    }
+
+    @Test
     void deactivatedLoginWithWrongPasswordDoesNotRevealStatus() {
         existing(AccountStatus.DEACTIVATED);
         assertThatThrownBy(() -> service.login(new LoginRequest("asha@example.com", "Wrong1234")))
