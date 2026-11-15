@@ -68,6 +68,17 @@ public class Job {
     @Column(name = "max_backlogs", nullable = false)
     private int maxBacklogs;
 
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "screening_mode", nullable = false, length = 20)
+    private com.placehub.job.domain.ScreeningMode screeningMode = com.placehub.job.domain.ScreeningMode.MANUAL;
+
+    @Column(name = "auto_shortlist_min_cgpa", precision = 4, scale = 2)
+    private BigDecimal autoShortlistMinCgpa;
+
+    @Column(name = "auto_shortlist_max_backlogs")
+    private Integer autoShortlistMaxBacklogs;
+
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "job_eligible_branches", joinColumns = @JoinColumn(name = "job_id"))
     @Enumerated(EnumType.STRING)
@@ -136,6 +147,34 @@ public class Job {
             this.eligibleGraduationYears.addAll(years);
         }
         this.deadline = deadline;
+    }
+
+    public void applyScreening(com.placehub.job.domain.ScreeningMode mode, BigDecimal autoMinCgpa,
+                               Integer autoMaxBacklogs) {
+        this.screeningMode = mode;
+        this.autoShortlistMinCgpa = autoMinCgpa;
+        this.autoShortlistMaxBacklogs = autoMaxBacklogs;
+    }
+
+    public com.placehub.job.domain.ScreeningMode getScreeningMode() {
+        return screeningMode;
+    }
+
+    public BigDecimal getAutoShortlistMinCgpa() {
+        return autoShortlistMinCgpa;
+    }
+
+    public Integer getAutoShortlistMaxBacklogs() {
+        return autoShortlistMaxBacklogs;
+    }
+
+    /** Effective auto-shortlist CGPA: the stricter configured value, or the eligibility minimum when unset. */
+    public BigDecimal effectiveAutoMinCgpa() {
+        return autoShortlistMinCgpa != null ? autoShortlistMinCgpa : minCgpa;
+    }
+
+    public int effectiveAutoMaxBacklogs() {
+        return autoShortlistMaxBacklogs != null ? autoShortlistMaxBacklogs : maxBacklogs;
     }
 
     public void setStatus(JobStatus status) {

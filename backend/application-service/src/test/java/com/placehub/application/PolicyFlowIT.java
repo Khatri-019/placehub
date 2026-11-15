@@ -119,6 +119,10 @@ class PolicyFlowIT {
     }
 
     UUID job(String ctc, String type) {
+        return job(ctc, type, "MANUAL");
+    }
+
+    UUID job(String ctc, String type, String screening) {
         UUID id = UUID.randomUUID();
         wiremock.stubFor(post(urlEqualTo("/internal/jobs/" + id + "/validate-eligibility"))
                 .willReturn(aResponse().withHeader("Content-Type", "application/json")
@@ -127,8 +131,9 @@ class PolicyFlowIT {
                 .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("""
                         {"jobId":"%s","title":"Job %s","companyId":"%s","companyName":"Corp %s",
                          "recruiterOwnerUserId":"%s","status":"PUBLISHED","deadline":"2099-01-01T00:00:00Z",
-                         "ctcLpa":%s,"employmentType":"%s"}"""
-                        .formatted(id, ctc, UUID.randomUUID(), ctc, recruiterId, ctc, type))));
+                         "ctcLpa":%s,"employmentType":"%s","screeningMode":"%s","autoShortlistMinCgpa":8.0,
+                         "autoShortlistMaxBacklogs":0}"""
+                        .formatted(id, ctc, UUID.randomUUID(), ctc, recruiterId, ctc, type, screening))));
         return id;
     }
 
@@ -229,6 +234,37 @@ class PolicyFlowIT {
                         .param("studentUserId", studentId.toString()).header("Authorization", token(adminId, "ADMIN")))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         assertThat(csv).contains(consentApp.toString()).contains("\"policy student\"");
+    }
+
+    @Test
+    void autoShortlistWritesCreatedThenSystemStatusChangedInOrder() throws Exception {
+        UUID app = created(apply(job("10.00", "FULL_TIME", "AUTO_SHORTLIST"), null)); // cgpa 8.4 >= 8.0
+        assertThat(applications.findById(app).orElseThrow().getStatus()).isEqualTo(ApplicationStatus.SHORTLISTED);
+        List<OutboxEvent> events = outbox.inInsertionOrder(app);
+        assertThat(events).extracting(OutboxEvent::getEventType)
+                .containsExactly(ApplicationEvents.CREATED, ApplicationEvents.STATUS_CHANGED);
+        assertThat(json.readTree(events.get(0).getPayload()).get("autoShortlisted").asBoolean()).isTrue();
+        JsonNode change = json.readTree(events.get(1).getPayload());
+        assertThat(change.get("actorType").asString()).isEqualTo("SYSTEM");
+        assertThat(change.get("changedByUserId").isNull()).isTrue();
+        assertThat(change.get("newStatus").asString()).isEqualTo("SHORTLISTED");
+        for (int i = 0; i < 50 && outbox.inInsertionOrder(app).stream()
+                .anyMatch(e -> e.getStatus() != OutboxEvent.Status.SENT); i++) {
+            Thread.sleep(200);
+        }
+        assertThat(outbox.inInsertionOrder(app)).allMatch(e -> e.getStatus() == OutboxEvent.Status.SENT);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/applications/" + app + "/history")
+                        .header("Authorization", token(recruiterId, "RECRUITER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].toStatus").value("APPLIED"))
+                .andExpect(jsonPath("$[1].toStatus").value("SHORTLISTED"))
+                .andExpect(jsonPath("$[1].actorType").value("SYSTEM"));
+        // Recruiters keep manual control: they can still reject an auto-shortlisted candidate.
+        move(app, "REJECTED");
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/applications/" + app + "/history")
+                        .header("Authorization", token(UUID.randomUUID(), "RECRUITER")))
+                .andExpect(status().isNotFound());
     }
 
     @Test

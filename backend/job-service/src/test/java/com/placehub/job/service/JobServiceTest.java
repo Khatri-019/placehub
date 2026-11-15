@@ -148,6 +148,38 @@ class JobServiceTest {
     }
 
     @Test
+    void autoShortlistCriteriaMustBeAtLeastAsStrictAndDefaultToEligibility() {
+        when(companies.findByRecruiterOwnerUserId(ownerId)).thenReturn(Optional.of(company));
+        JobRequest looser = new JobRequest("SE", "d", "Pune", EmploymentType.FULL_TIME, null, new BigDecimal("10"),
+                new BigDecimal("7.00"), 1, Set.of(), Set.of(), NOW.plusSeconds(60),
+                com.placehub.job.domain.ScreeningMode.AUTO_SHORTLIST, new BigDecimal("6.50"), null);
+        assertThatThrownBy(() -> service.create(owner, looser))
+                .satisfies(e -> assertThat(status(e)).isEqualTo(HttpStatus.BAD_REQUEST))
+                .hasMessageContaining("at least as strict");
+        JobRequest moreBacklogs = new JobRequest("SE", "d", "Pune", EmploymentType.FULL_TIME, null, new BigDecimal("10"),
+                new BigDecimal("7.00"), 1, Set.of(), Set.of(), NOW.plusSeconds(60),
+                com.placehub.job.domain.ScreeningMode.AUTO_SHORTLIST, null, 2);
+        assertThatThrownBy(() -> service.create(owner, moreBacklogs))
+                .satisfies(e -> assertThat(status(e)).isEqualTo(HttpStatus.BAD_REQUEST));
+        JobRequest ok = new JobRequest("SE", "d", "Pune", EmploymentType.FULL_TIME, null, new BigDecimal("10"),
+                new BigDecimal("7.00"), 1, Set.of(), Set.of(), NOW.plusSeconds(60),
+                com.placehub.job.domain.ScreeningMode.AUTO_SHORTLIST, new BigDecimal("8.00"), 0);
+        var res = service.create(owner, ok);
+        assertThat(res.screeningMode()).isEqualTo(com.placehub.job.domain.ScreeningMode.AUTO_SHORTLIST);
+        assertThat(res.autoShortlistMinCgpa()).isEqualByComparingTo("8.00");
+        // v2-style requests default to MANUAL; a null mode on update keeps the current mode.
+        assertThat(service.create(owner, request(NOW.plusSeconds(60))).screeningMode())
+                .isEqualTo(com.placehub.job.domain.ScreeningMode.MANUAL);
+        job.applyScreening(com.placehub.job.domain.ScreeningMode.AUTO_SHORTLIST, null, null);
+        assertThat(service.update(owner, job.getId(), request(NOW.plusSeconds(60))).screeningMode())
+                .isEqualTo(com.placehub.job.domain.ScreeningMode.AUTO_SHORTLIST);
+        var summary = service.summary(job.getId());
+        assertThat(summary.screeningMode()).isEqualTo(com.placehub.job.domain.ScreeningMode.AUTO_SHORTLIST);
+        assertThat(summary.autoShortlistMinCgpa()).isEqualByComparingTo(job.getMinCgpa());
+        assertThat(summary.autoShortlistMaxBacklogs()).isEqualTo(job.getMaxBacklogs());
+    }
+
+    @Test
     void closedJobsAreReadOnly() {
         job.setStatus(JobStatus.CLOSED);
         assertThatThrownBy(() -> service.update(owner, job.getId(), request(NOW.plusSeconds(60))))

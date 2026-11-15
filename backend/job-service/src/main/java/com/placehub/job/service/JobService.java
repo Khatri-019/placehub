@@ -7,6 +7,7 @@ import com.placehub.common.security.AuthUser;
 import com.placehub.job.domain.Branch;
 import com.placehub.job.domain.EmploymentType;
 import com.placehub.job.domain.JobStatus;
+import com.placehub.job.domain.ScreeningMode;
 import com.placehub.job.dto.EligibilityRequest;
 import com.placehub.job.dto.EligibilityResponse;
 import com.placehub.job.dto.JobRequest;
@@ -62,6 +63,7 @@ public class JobService {
                 .orElseThrow(() -> ApiException.conflict(COMPANY_FIRST));
         Job job = new Job(UUID.randomUUID(), company);
         applyRequest(job, req);
+        applyScreening(job, req, true);
         jobs.saveAndFlush(job);
         return JobMapper.toResponse(job);
     }
@@ -80,6 +82,7 @@ public class JobService {
             requireCtcForFullTime(req.employmentType(), req.ctcLpa());
         }
         applyRequest(job, req);
+        applyScreening(job, req, false);
         jobs.saveAndFlush(job);
         return JobMapper.toResponse(job);
     }
@@ -208,6 +211,27 @@ public class JobService {
 
     private static ApiException jobNotFound() {
         return ApiException.notFound("Job not found");
+    }
+
+    static final String AUTO_NOT_STRICTER = "Auto-shortlist criteria must be at least as strict as the eligibility criteria";
+
+    /** Applies screening settings; a null mode on update keeps the job's current mode (spec 20.4). */
+    static void applyScreening(Job job, JobRequest req, boolean creating) {
+        ScreeningMode mode = req.screeningMode() != null ? req.screeningMode()
+                : creating ? ScreeningMode.MANUAL : job.getScreeningMode();
+        BigDecimal minCgpa = req.minCgpa() == null ? BigDecimal.ZERO : req.minCgpa();
+        int maxBacklogs = req.maxBacklogs() == null ? 0 : req.maxBacklogs();
+        if (req.autoShortlistMinCgpa() != null && req.autoShortlistMinCgpa().compareTo(minCgpa) < 0) {
+            throw ApiException.badRequest(AUTO_NOT_STRICTER + ": auto-shortlist minimum CGPA ("
+                    + req.autoShortlistMinCgpa().toPlainString() + ") is below the eligibility minimum ("
+                    + minCgpa.toPlainString() + ")");
+        }
+        if (req.autoShortlistMaxBacklogs() != null && req.autoShortlistMaxBacklogs() > maxBacklogs) {
+            throw ApiException.badRequest(AUTO_NOT_STRICTER + ": auto-shortlist maximum backlogs ("
+                    + req.autoShortlistMaxBacklogs() + ") exceeds the eligibility maximum (" + maxBacklogs + ")");
+        }
+        job.applyScreening(mode, req.autoShortlistMinCgpa() == null ? null
+                : req.autoShortlistMinCgpa().setScale(2, RoundingMode.HALF_UP), req.autoShortlistMaxBacklogs());
     }
 
     private static void applyRequest(Job job, JobRequest req) {

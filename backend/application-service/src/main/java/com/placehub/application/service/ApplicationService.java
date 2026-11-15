@@ -3,6 +3,7 @@ package com.placehub.application.service;
 import com.placehub.application.client.ClientDtos;
 import com.placehub.application.client.DependencyGateway;
 import com.placehub.application.domain.ApplicationStatus;
+import com.placehub.application.dto.ApplicationDtos;
 import com.placehub.application.dto.ApplicationDtos.ApplicationResponse;
 import com.placehub.application.dto.ApplicationDtos.EligibilityPreview;
 import com.placehub.application.dto.ApplicationDtos.StatusStats;
@@ -52,10 +53,13 @@ public class ApplicationService {
     private final ApplyRequirements requirements;
     private final PlacementService placements;
     private final Clock clock;
+    private final com.placehub.application.repository.StatusHistoryRepository historyRepository;
 
     public ApplicationService(ApplicationRepository applications, ApplicationWriter writer,
                               DependencyGateway dependencies, ApplyRequirements requirements,
-                              PlacementService placements, Clock clock) {
+                              PlacementService placements, Clock clock,
+                              com.placehub.application.repository.StatusHistoryRepository historyRepository) {
+        this.historyRepository = historyRepository;
         this.applications = applications;
         this.writer = writer;
         this.dependencies = dependencies;
@@ -109,8 +113,9 @@ public class ApplicationService {
                     band, ConsentText.sha256(rendered), rendered, signed, clock.instant(),
                     truncate(client.ip(), 64), truncate(client.userAgent(), 512));
         }
+        boolean auto = AutoShortlist.qualifies(job, profile.cgpa(), profile.backlogCount());
         try {
-            return ApplicationMapper.toResponse(writer.create(application, consentRecord), false);
+            return ApplicationMapper.toResponse(writer.create(application, consentRecord, auto), false);
         } catch (DataIntegrityViolationException e) {
             throw ApiException.conflict(ALREADY_APPLIED);
         }
@@ -196,6 +201,65 @@ public class ApplicationService {
         byte[] body = upstream.getBody() == null ? new byte[0] : upstream.getBody();
         String filename = com.placehub.common.web.PdfDownloads.filenameOf(upstream.getHeaders());
         return com.placehub.common.web.PdfDownloads.attachment(body, filename);
+    }
+
+    /** Status timeline; same visibility as {@link #get} (owning student, owning recruiter, admin; else 404). */
+    public List<ApplicationDtos.HistoryEntry> history(AuthUser viewer, UUID applicationId) {
+        Application application = applications.findById(applicationId).orElseThrow(ApplicationService::notFound);
+        boolean isStudentOwner = viewer.isStudent() && application.getStudentUserId().equals(viewer.id());
+        if (!isStudentOwner && !isRecruiterOwner(viewer, application) && !viewer.isAdmin()) {
+            throw notFound();
+        }
+        return historyRepository.timeline(applicationId).stream()
+                .map(h -> new ApplicationDtos.HistoryEntry(h.getFromStatus(), h.getToStatus(), h.getActorType(),
+                        isStudentOwner && !"SYSTEM".equals(h.getActorType()) && !viewer.id().equals(h.getActorUserId())
+                                ? null : h.getActorUserId(),
+                        isStudentOwner && h.getToStatus() != ApplicationStatus.WITHDRAWN && !"SYSTEM".equals(h.getActorType())
+                                ? null : h.getReason(),
+                        h.getChangedAt()))
+                .toList();
+    }
+
+    /** Each item runs in its own transaction with the single-update rules; failures never affect other items. */
+    public ApplicationDtos.BulkResult bulkStatus(AuthUser actor, List<UUID> ids, ApplicationStatus status, String note) {
+        List<ApplicationDtos.BulkItem> results = new java.util.ArrayList<>();
+        for (UUID id : new java.util.LinkedHashSet<>(ids)) {
+            try {
+                ApplicationResponse updated = updateStatus(actor, id, status, note);
+                results.add(new ApplicationDtos.BulkItem(id, true, updated.status(), null, null));
+            } catch (ApiException e) {
+                // Applications outside the caller's jobs are reported as not found, never as forbidden.
+                boolean hidden = e.getStatus() == HttpStatus.FORBIDDEN || e.getStatus() == HttpStatus.NOT_FOUND;
+                results.add(new ApplicationDtos.BulkItem(id, false, null, hidden ? "NOT_FOUND" : e.getStatus().name(),
+                        hidden ? "Application not found" : e.getMessage()));
+            } catch (org.springframework.dao.OptimisticLockingFailureException e) {
+                results.add(new ApplicationDtos.BulkItem(id, false, null, "CONFLICT",
+                        "The application was modified concurrently"));
+            }
+        }
+        long ok = results.stream().filter(ApplicationDtos.BulkItem::success).count();
+        return new ApplicationDtos.BulkResult(results, ok, results.size() - ok);
+    }
+
+    /** Shortlists every qualifying APPLIED application of an AUTO_SHORTLIST job as SYSTEM (spec 20.4). */
+    public ApplicationDtos.AutoScreenResult autoScreen(AuthUser actor, UUID jobId) {
+        ClientDtos.JobSummary job = dependencies.jobSummary(jobId);
+        if (!actor.isAdmin() && !(actor.isRecruiter() && actor.id().equals(job.recruiterOwnerUserId()))) {
+            throw ApiException.forbidden("Only the job's recruiter or an admin can screen its applicants");
+        }
+        if (!"AUTO_SHORTLIST".equals(job.screeningMode())) {
+            throw ApiException.conflict("Switch the job to automatic shortlisting first");
+        }
+        Specification<Application> spec = eq("jobId", jobId).and(statusIs(ApplicationStatus.APPLIED));
+        List<Application> applied = applications.findAll(spec);
+        int shortlisted = 0;
+        for (Application a : applied) {
+            if (AutoShortlist.qualifies(job, a.getCgpaSnapshot(), a.getBacklogCountSnapshot())) {
+                writer.systemShortlist(a);
+                shortlisted++;
+            }
+        }
+        return new ApplicationDtos.AutoScreenResult(shortlisted, applied.size());
     }
 
     // ------------------------------------------------------------------ recruiter / admin

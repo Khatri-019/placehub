@@ -47,12 +47,32 @@ public class ApplicationWriter {
      */
     @Transactional
     public Application create(Application application, ConsentFactory consent) {
+        return create(application, consent, false);
+    }
+
+    /**
+     * When {@code autoShortlist} is true the application is created as APPLIED and moved to SHORTLISTED as SYSTEM in
+     * the same transaction, writing APPLICATION_CREATED then APPLICATION_STATUS_CHANGED (spec 20.4).
+     */
+    @Transactional
+    public Application create(Application application, ConsentFactory consent, boolean autoShortlist) {
         Application saved = applications.saveAndFlush(application);
         history.record(saved, null, ApplicationStatus.APPLIED, ActorType.USER, saved.getStudentUserId(), null);
-        outbox.applicationCreated(saved);
+        outbox.applicationCreated(saved, autoShortlist);
         if (consent != null) {
             consents.save(consent.forApplication(saved.getId()));
         }
+        return autoShortlist ? systemShortlist(saved) : saved;
+    }
+
+    /** Moves an APPLIED application to SHORTLISTED with actor SYSTEM (auto-shortlist and auto-screen). */
+    @Transactional
+    public Application systemShortlist(Application application) {
+        ApplicationStatus old = application.getStatus();
+        application.changeStatus(ApplicationStatus.SHORTLISTED, null);
+        Application saved = applications.saveAndFlush(application);
+        history.record(saved, old, ApplicationStatus.SHORTLISTED, ActorType.SYSTEM, null, AutoShortlist.REASON);
+        outbox.statusChanged(saved, old, null, ActorType.SYSTEM.name(), AutoShortlist.REASON);
         return saved;
     }
 

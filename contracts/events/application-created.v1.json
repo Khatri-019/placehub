@@ -9,5 +9,6 @@
   "studentName": "Demo Student",
   "recruiterUserId": "00000000-0000-0000-0000-000000000002",
   "jobTitle": "Graduate Software Engineer",
-  "companyName": "Northstar Technologies"
+  "companyName": "Northstar Technologies",
+  "autoShortlisted": false
 }

@@ -2,6 +2,7 @@ package com.placehub.job.dto;
 
 import com.placehub.job.domain.Branch;
 import com.placehub.job.domain.EmploymentType;
+import com.placehub.job.domain.ScreeningMode;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
@@ -26,5 +27,16 @@ public record JobRequest(
         @Min(0) @Max(50) Integer maxBacklogs,
         Set<@NotNull Branch> eligibleBranches,
         Set<@NotNull @Min(2020) @Max(2035) Integer> eligibleGraduationYears,
-        @NotNull Instant deadline) {
+        @NotNull Instant deadline,
+        ScreeningMode screeningMode,
+        @DecimalMin("0.00") @DecimalMax("10.00") @Digits(integer = 2, fraction = 2) BigDecimal autoShortlistMinCgpa,
+        @Min(0) @Max(50) Integer autoShortlistMaxBacklogs) {
+
+    /** v2-compatible constructor (manual screening). */
+    public JobRequest(String title, String description, String location, EmploymentType employmentType, String ctc,
+                      BigDecimal ctcLpa, BigDecimal minCgpa, Integer maxBacklogs, Set<Branch> eligibleBranches,
+                      Set<Integer> eligibleGraduationYears, Instant deadline) {
+        this(title, description, location, employmentType, ctc, ctcLpa, minCgpa, maxBacklogs, eligibleBranches,
+                eligibleGraduationYears, deadline, null, null, null);
+    }
 }

@@ -34,12 +34,17 @@ public class OutboxWriter {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public OutboxEvent applicationCreated(Application a) {
+        return applicationCreated(a, false);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public OutboxEvent applicationCreated(Application a, boolean autoShortlisted) {
         UUID eventId = UUID.randomUUID();
         Instant now = clock.instant();
         var event = new ApplicationEvents.ApplicationCreated(eventId, ApplicationEvents.CREATED,
                 ApplicationEvents.VERSION, now, a.getId(), a.getJobId(), a.getStudentUserId(),
                 a.getStudentNameSnapshot(), a.getRecruiterOwnerUserId(), a.getJobTitleSnapshot(),
-                a.getCompanyNameSnapshot());
+                a.getCompanyNameSnapshot(), autoShortlisted);
         return save(eventId, a.getId(), ApplicationEvents.CREATED, ApplicationEvents.CREATED_TOPIC, event, now);
     }
 

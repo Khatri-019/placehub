@@ -21,4 +21,8 @@ public interface OutboxRepository extends JpaRepository<OutboxEvent, UUID> {
     List<OutboxEvent> lockDueBatch(@Param("now") Instant now, @Param("limit") int limit);
 
     List<OutboxEvent> findByAggregateIdOrderByCreatedAt(UUID aggregateId);
+
+    /** Rows for one aggregate in insertion (relay) order. */
+    @Query(value = "SELECT * FROM outbox_events WHERE aggregate_id = :id ORDER BY seq", nativeQuery = true)
+    List<OutboxEvent> inInsertionOrder(@Param("id") UUID aggregateId);
 }

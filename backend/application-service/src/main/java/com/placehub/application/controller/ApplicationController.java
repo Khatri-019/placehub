@@ -111,6 +111,26 @@ public class ApplicationController {
         return service.get(AuthUser.from(jwt), id);
     }
 
+    @GetMapping("/api/applications/{id}/history")
+    public java.util.List<com.placehub.application.dto.ApplicationDtos.HistoryEntry> history(
+            @AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        return service.history(AuthUser.from(jwt), id);
+    }
+
+    @PatchMapping("/api/applications/bulk-status")
+    @PreAuthorize("hasAnyRole('RECRUITER', 'ADMIN')")
+    public com.placehub.application.dto.ApplicationDtos.BulkResult bulkStatus(@AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody com.placehub.application.dto.ApplicationDtos.BulkStatusRequest request) {
+        return service.bulkStatus(AuthUser.from(jwt), request.applicationIds(), request.status(), request.note());
+    }
+
+    @PostMapping("/api/applications/job/{jobId}/auto-screen")
+    @PreAuthorize("hasAnyRole('RECRUITER', 'ADMIN')")
+    public com.placehub.application.dto.ApplicationDtos.AutoScreenResult autoScreen(@AuthenticationPrincipal Jwt jwt,
+                                                                                   @PathVariable UUID jobId) {
+        return service.autoScreen(AuthUser.from(jwt), jobId);
+    }
+
     @GetMapping("/api/applications/{id}/resume")
     public ResponseEntity<byte[]> resume(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         return service.resume(AuthUser.from(jwt), id);

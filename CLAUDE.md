@@ -66,7 +66,11 @@ Phase 9 (v3, BUILD_SPEC §20):
       403s, versioning keeps snapshots); notification +5 (placement topic, SYSTEM wording); app verify 152 tests;
       compose: policy v1 active, simulate 12→20 = REQUIRE_CONSENT 1.67; smoke 35/35; Playwright 10/10.
       Policy UI (admin pages, consent modal, banner, badges) is delivered with the 9.6 redesign
-- [ ] 9.4 Auto-shortlisting, status history, bulk status, auto-screen
+- [x] 9.4 Auto-shortlist (backend) — job V3 screening columns; JobServiceTest +1 (strictness 400, defaults, keep
+      mode on null, effective criteria in summary); job verify 33; ApplicationServiceTest +5 (decision, apply flag,
+      bulk per-item with foreign → NOT_FOUND, auto-screen ownership/mode, history visibility); PolicyFlowIT +1
+      (CREATED then STATUS_CHANGED SYSTEM by seq, both SENT, 2-row history, manual reject, foreign 404);
+      app+notif verify 178; smoke 35/35; Playwright 10/10
 - [ ] 9.5 Separate login portals (backend portal check + UI routes)
 - [ ] 9.6 UI redesign (tokens, components, lazy routes, size budget, Lighthouse, dark theme)
 - [ ] 9.7 Security review (fresh subagent) + test-first fixes
@@ -75,7 +79,7 @@ Phase 9 (v3, BUILD_SPEC §20):
 Definition of Done (v2 §17): all [x] (see git history of this file). Frontend click-through gap closes with Playwright.
 
 ## 5. Current state
-- Phase 9.4 (auto-shortlist backend) next. Stack running with 9.3 images. Frontend for 9.3-9.5 is built in 9.6.
+- Phase 9.5 (portal login backend + routes) next. Stack running with 9.4 images. Frontend for 9.3-9.5 is built in 9.6.
 
 ## 6. Known issues / deviations from spec
 - Java 25 instead of 21 (user edit). VS Code redhat.java may race on `target/` → rerun `./mvnw clean verify`.

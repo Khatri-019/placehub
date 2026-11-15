@@ -3,6 +3,7 @@ package com.placehub.application.service;
 import com.placehub.application.client.ClientDtos;
 import com.placehub.application.client.DependencyGateway;
 import com.placehub.application.domain.ApplicationStatus;
+import com.placehub.application.dto.ApplicationDtos;
 import com.placehub.application.entity.Application;
 import com.placehub.application.repository.ApplicationRepository;
 import com.placehub.common.error.ApiException;
@@ -53,7 +54,9 @@ class ApplicationServiceTest {
     PlacementService placements = mock(PlacementService.class);
     Clock clock = Clock.fixed(Instant.parse("2026-11-15T10:00:00Z"), ZoneOffset.UTC);
     ApplyRequirements requirements = new ApplyRequirements(deps, policies, placements, new PolicyEvaluator(clock), repo);
-    ApplicationService service = new ApplicationService(repo, writer, deps, requirements, placements, clock);
+    com.placehub.application.repository.StatusHistoryRepository historyRepo =
+            mock(com.placehub.application.repository.StatusHistoryRepository.class);
+    ApplicationService service = new ApplicationService(repo, writer, deps, requirements, placements, clock, historyRepo);
 
     static final String CONSENT = "Consent for {{jobTitle}} at {{companyName}} paying {{ctcLpa}} (now {{currentCtc}})";
 
@@ -111,7 +114,7 @@ class ApplicationServiceTest {
         when(deps.jobSummary(jobId)).thenReturn(new ClientDtos.JobSummary(jobId, "Graduate SE", UUID.randomUUID(),
                 "Northstar", recruiterId, "PUBLISHED", Instant.now().plusSeconds(3600), new BigDecimal("12.00"),
                 "FULL_TIME"));
-        when(writer.create(any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        when(writer.create(any(), any(), org.mockito.ArgumentMatchers.anyBoolean())).thenAnswer(inv -> inv.getArgument(0));
         when(writer.changeStatus(any(), any(), any(), any())).thenAnswer(inv -> {
             Application a = inv.getArgument(0);
             a.changeStatus(inv.getArgument(1), inv.getArgument(2));
@@ -136,7 +139,7 @@ class ApplicationServiceTest {
         assertThat(res.studentUserId()).isEqualTo(student.id());
         assertThat(res.ctcLpa()).isEqualByComparingTo("12.00");
         assertThat(res.employmentType()).isEqualTo("FULL_TIME");
-        verify(writer).create(any(), any());
+        verify(writer).create(any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
     }
 
     @Test
@@ -153,7 +156,7 @@ class ApplicationServiceTest {
                     assertThat((List<String>) details.get("reasons"))
                             .containsExactly("Minimum CGPA required is 7.50; yours is 6.90");
                 });
-        verify(writer, never()).create(any(), any());
+        verify(writer, never()).create(any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
     }
 
     @Test
@@ -164,7 +167,7 @@ class ApplicationServiceTest {
         assertThat(res.hasResume()).isTrue();
         verify(deps).referenceResume(student.id(), resumeId);
         org.mockito.ArgumentCaptor<Application> saved = org.mockito.ArgumentCaptor.forClass(Application.class);
-        verify(writer).create(saved.capture(), any());
+        verify(writer).create(saved.capture(), any(), org.mockito.ArgumentMatchers.anyBoolean());
         assertThat(saved.getValue().getResumeIdSnapshot()).isEqualTo(resumeId);
     }
 
@@ -184,7 +187,7 @@ class ApplicationServiceTest {
                     assertThat((List<Map<String, String>>) d.get("violations")).extracting(m -> m.get("code"))
                             .containsExactly("NOT_ELIGIBLE", "RESUME_REQUIRED");
                 });
-        verify(writer, never()).create(any(), any());
+        verify(writer, never()).create(any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
         verify(deps, never()).referenceResume(any(), any());
     }
 
@@ -235,7 +238,7 @@ class ApplicationServiceTest {
                             .isEqualTo("Consent for Senior DE at Meridian paying 20.00 (now 12.00)");
                     assertThat(consent.get("band")).isEqualTo("[1.50, 2.00) REQUIRE_CONSENT lock");
                 });
-        verify(writer, never()).create(any(), any());
+        verify(writer, never()).create(any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
     }
 
     @Test
@@ -256,7 +259,7 @@ class ApplicationServiceTest {
         org.mockito.ArgumentCaptor<Application> app = org.mockito.ArgumentCaptor.forClass(Application.class);
         org.mockito.ArgumentCaptor<ApplicationWriter.ConsentFactory> factory =
                 org.mockito.ArgumentCaptor.forClass(ApplicationWriter.ConsentFactory.class);
-        verify(writer).create(app.capture(), factory.capture());
+        verify(writer).create(app.capture(), factory.capture(), org.mockito.ArgumentMatchers.eq(false));
         assertThat(app.getValue().getPolicyDecisionSnapshot()).isEqualTo("REQUIRE_CONSENT");
         assertThat(app.getValue().getRatioSnapshot()).isEqualByComparingTo("1.67");
         assertThat(app.getValue().isLockOnPlacementSnapshot()).isTrue();
@@ -281,7 +284,7 @@ class ApplicationServiceTest {
         jobPays("30.00", "FULL_TIME");
         assertThatThrownBy(() -> service.apply(student, jobId))
                 .satisfies(e -> assertThat(codes(e)).containsExactly("STUDENT_LOCKED"));
-        verify(writer, never()).create(any(), any());
+        verify(writer, never()).create(any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
     }
 
     @Test
@@ -291,7 +294,7 @@ class ApplicationServiceTest {
         assertThat(service.apply(student, jobId).status()).isEqualTo(ApplicationStatus.APPLIED);
         jobPays(null, "INTERNSHIP");
         assertThat(service.apply(student, jobId).status()).isEqualTo(ApplicationStatus.APPLIED);
-        verify(writer, org.mockito.Mockito.times(2)).create(any(), org.mockito.ArgumentMatchers.isNull());
+        verify(writer, org.mockito.Mockito.times(2)).create(any(), org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.eq(false));
     }
 
     @Test
@@ -323,14 +326,96 @@ class ApplicationServiceTest {
         when(repo.existsByJobIdAndStudentUserId(jobId, student.id())).thenReturn(true);
         assertThatThrownBy(() -> service.apply(student, jobId))
                 .satisfies(e -> assertThat(status(e)).isEqualTo(HttpStatus.CONFLICT));
-        verify(writer, never()).create(any(), any());
+        verify(writer, never()).create(any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
+    }
+
+    // ---------------------------------------------------------------- auto-shortlist, bulk, auto-screen
+
+    void autoJob(String minCgpa, Integer maxBacklogs) {
+        when(deps.jobSummary(jobId)).thenReturn(new ClientDtos.JobSummary(jobId, "Senior DE", UUID.randomUUID(),
+                "Meridian", recruiterId, "PUBLISHED", Instant.now().plusSeconds(3600), new BigDecimal("20.00"),
+                "FULL_TIME", "AUTO_SHORTLIST", minCgpa == null ? null : new BigDecimal(minCgpa), maxBacklogs));
+        when(deps.validateEligibility(eq(jobId), any())).thenReturn(
+                new ClientDtos.EligibilityResult(jobId, true, List.of()));
+    }
+
+    @Test
+    void autoShortlistDecision() {
+        var job = new ClientDtos.JobSummary(jobId, "t", null, "c", recruiterId, "PUBLISHED", Instant.now(),
+                BigDecimal.TEN, "FULL_TIME", "AUTO_SHORTLIST", new BigDecimal("8.00"), 0);
+        assertThat(AutoShortlist.qualifies(job, new BigDecimal("8.00"), 0)).isTrue();
+        assertThat(AutoShortlist.qualifies(job, new BigDecimal("7.99"), 0)).isFalse();
+        assertThat(AutoShortlist.qualifies(job, new BigDecimal("9.50"), 1)).isFalse();
+        var manual = new ClientDtos.JobSummary(jobId, "t", null, "c", recruiterId, "PUBLISHED", Instant.now(),
+                BigDecimal.TEN, "FULL_TIME");
+        assertThat(AutoShortlist.qualifies(manual, new BigDecimal("9.99"), 0)).isFalse();
+    }
+
+    @Test
+    void qualifyingApplicantsOnAutoJobsAreCreatedAsAutoShortlist() {
+        autoJob("8.00", 0);
+        service.apply(student, jobId);
+        verify(writer).create(any(), any(), org.mockito.ArgumentMatchers.eq(true));
+        autoJob("9.00", 0); // the student's 8.60 misses the cutoff: stays APPLIED for manual review
+        service.apply(student, jobId);
+        verify(writer).create(any(), any(), org.mockito.ArgumentMatchers.eq(false));
+    }
+
+    @Test
+    void bulkStatusReportsPerItemResultsAndHidesOtherRecruitersApplications() {
+        Application mine = existing(ApplicationStatus.APPLIED);
+        Application rejected = existing(ApplicationStatus.REJECTED);
+        Application foreign = new Application(UUID.randomUUID(), jobId, student.id(), UUID.randomUUID(), "SE", "X",
+                "Asha", "s@x.com", "CSE", new BigDecimal("8.60"), 2027, 0);
+        when(repo.findById(foreign.getId())).thenReturn(Optional.of(foreign));
+        UUID missing = UUID.randomUUID();
+        when(repo.findById(missing)).thenReturn(Optional.empty());
+        var result = service.bulkStatus(recruiter, List.of(mine.getId(), rejected.getId(), foreign.getId(), missing),
+                ApplicationStatus.SHORTLISTED, "batch");
+        assertThat(result.succeeded()).isEqualTo(1);
+        assertThat(result.failed()).isEqualTo(3);
+        assertThat(result.results()).extracting(ApplicationDtos.BulkItem::code)
+                .containsExactly(null, "CONFLICT", "NOT_FOUND", "NOT_FOUND");
+        assertThat(result.results().get(2).message()).isEqualTo("Application not found");
+        verify(writer, org.mockito.Mockito.times(1)).changeStatus(any(), any(), any(), any());
+    }
+
+    @Test
+    void autoScreenRequiresOwnershipAndAutoMode() {
+        autoJob("8.00", 0);
+        assertThatThrownBy(() -> service.autoScreen(otherRecruiter, jobId))
+                .satisfies(e -> assertThat(status(e)).isEqualTo(HttpStatus.FORBIDDEN));
+        Application qualifies = existing(ApplicationStatus.APPLIED);
+        Application low = new Application(UUID.randomUUID(), jobId, UUID.randomUUID(), recruiterId, "SE", "N", "Low",
+                "l@x.com", "CSE", new BigDecimal("7.00"), 2027, 0);
+        when(repo.findAll(org.mockito.ArgumentMatchers.<org.springframework.data.jpa.domain.Specification<Application>>any()))
+                .thenReturn(List.of(qualifies, low));
+        var res = service.autoScreen(recruiter, jobId);
+        assertThat(res.shortlisted()).isEqualTo(1);
+        assertThat(res.evaluated()).isEqualTo(2);
+        verify(writer).systemShortlist(qualifies);
+        verify(writer, never()).systemShortlist(low);
+        jobPays("12.00", "FULL_TIME"); // manual job
+        assertThatThrownBy(() -> service.autoScreen(recruiter, jobId))
+                .satisfies(e -> assertThat(status(e)).isEqualTo(HttpStatus.CONFLICT));
+    }
+
+    @Test
+    void historyIsVisibleOnlyToParticipants() {
+        Application a = existing(ApplicationStatus.APPLIED);
+        when(historyRepo.timeline(a.getId())).thenReturn(List.of(new com.placehub.application.entity.StatusHistory(
+                UUID.randomUUID(), a.getId(), null, ApplicationStatus.APPLIED, "USER", student.id(), null, Instant.now())));
+        assertThat(service.history(student, a.getId())).hasSize(1);
+        assertThat(service.history(recruiter, a.getId())).hasSize(1);
+        assertThatThrownBy(() -> service.history(otherRecruiter, a.getId()))
+                .satisfies(e -> assertThat(status(e)).isEqualTo(HttpStatus.NOT_FOUND));
     }
 
     @Test
     void duplicateIsMappedFromTheUniqueConstraintTo409() {
         when(deps.validateEligibility(eq(jobId), any())).thenReturn(
                 new ClientDtos.EligibilityResult(jobId, true, List.of()));
-        when(writer.create(any(), any())).thenThrow(new DataIntegrityViolationException("uq_app_job_student"));
+        when(writer.create(any(), any(), org.mockito.ArgumentMatchers.anyBoolean())).thenThrow(new DataIntegrityViolationException("uq_app_job_student"));
         assertThatThrownBy(() -> service.apply(student, jobId))
                 .hasMessage(ApplicationService.ALREADY_APPLIED)
                 .satisfies(e -> assertThat(status(e)).isEqualTo(HttpStatus.CONFLICT));
@@ -346,7 +431,7 @@ class ApplicationServiceTest {
                 .thenThrow(new DependencyUnavailableException(DependencyGateway.UNAVAILABLE));
         assertThatThrownBy(() -> service.apply(student, jobId))
                 .satisfies(e -> assertThat(status(e)).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
-        verify(writer, never()).create(any(), any());
+        verify(writer, never()).create(any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
     }
 
     @Test

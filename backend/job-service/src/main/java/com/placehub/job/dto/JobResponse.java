@@ -3,6 +3,7 @@ package com.placehub.job.dto;
 import com.placehub.job.domain.Branch;
 import com.placehub.job.domain.EmploymentType;
 import com.placehub.job.domain.JobStatus;
+import com.placehub.job.domain.ScreeningMode;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -14,5 +15,6 @@ public record JobResponse(UUID id, UUID companyId, String companyName, UUID recr
                           BigDecimal ctcLpa,
                           BigDecimal minCgpa, int maxBacklogs, List<Branch> eligibleBranches,
                           List<Integer> eligibleGraduationYears, Instant deadline, JobStatus status,
-                          Instant createdAt, Instant updatedAt) {
+                          Instant createdAt, Instant updatedAt, ScreeningMode screeningMode,
+                          BigDecimal autoShortlistMinCgpa, Integer autoShortlistMaxBacklogs) {
 }

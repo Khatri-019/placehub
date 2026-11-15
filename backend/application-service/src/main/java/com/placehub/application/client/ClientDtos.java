@@ -32,12 +32,20 @@ public final class ClientDtos {
 
     /** Job Service GET /internal/jobs/{id}/summary. */
     public record JobSummary(UUID jobId, String title, UUID companyId, String companyName, UUID recruiterOwnerUserId,
-                             String status, Instant deadline, BigDecimal ctcLpa, String employmentType) {
+                             String status, Instant deadline, BigDecimal ctcLpa, String employmentType,
+                             String screeningMode, BigDecimal autoShortlistMinCgpa, Integer autoShortlistMaxBacklogs) {
 
-        /** Compact constructor for callers that predate the v3 fields. */
+        /** Constructor for callers that predate the v3 fields. */
         public JobSummary(UUID jobId, String title, UUID companyId, String companyName, UUID recruiterOwnerUserId,
                           String status, Instant deadline) {
             this(jobId, title, companyId, companyName, recruiterOwnerUserId, status, deadline, null, null);
+        }
+
+        /** Constructor without screening fields (manual screening). */
+        public JobSummary(UUID jobId, String title, UUID companyId, String companyName, UUID recruiterOwnerUserId,
+                          String status, Instant deadline, BigDecimal ctcLpa, String employmentType) {
+            this(jobId, title, companyId, companyName, recruiterOwnerUserId, status, deadline, ctcLpa, employmentType,
+                    "MANUAL", null, null);
         }
 
         public boolean isFullTime() {

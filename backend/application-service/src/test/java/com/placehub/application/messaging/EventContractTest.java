@@ -25,6 +25,7 @@ class EventContractTest {
         var event = json.treeToValue(expected, ApplicationEvents.ApplicationCreated.class);
         assertThat(event.eventType()).isEqualTo(ApplicationEvents.CREATED);
         assertThat(event.eventVersion()).isEqualTo(ApplicationEvents.VERSION);
+        assertThat(event.autoShortlisted()).isFalse();
         assertThat(json.readTree(json.writeValueAsString(event))).isEqualTo(expected);
     }
 

@@ -192,5 +192,20 @@ Longer rationale for decisions. Operational status lives in `CLAUDE.md`; the spe
     placement banner, policy badges, bulk actions, portals) is built in the 9.6 redesign, so no page is built twice.
     Backend behaviour was verified per sub-phase through tests and the gateway.
 
+### 9.4 Auto-shortlisting
+51. Job Service exposes the *effective* criteria in the internal summary (configured value, or the eligibility value
+    when unset). Application Service therefore never needs the job's eligibility rules. The strictness rule is
+    enforced on create and update (400). A null `screeningMode` on update keeps the current mode, so v2 clients
+    can't accidentally switch it off.
+52. `ApplicationWriter.create(app, consent, autoShortlist)` writes, in one transaction: application → creation history
+    → APPLICATION_CREATED (`autoShortlisted: true`) → consent → SYSTEM shortlist history → APPLICATION_STATUS_CHANGED
+    (`actorType: SYSTEM`, `changedByUserId: null`). The two events relay in `seq` order. They land on different
+    topics, so order is guaranteed only at the outbox (Kafka orders within a partition, per topic).
+53. **Bulk status:** at most 100 distinct ids, each through the single-update path in its own transaction. Ids that
+    don't exist or belong to another recruiter's job both come back as `NOT_FOUND`, so a bulk call cannot probe other
+    recruiters' applications.
+54. **History visibility:** participants only (404 otherwise). For the student, other users' ids and recruiter notes
+    on non-withdrawal transitions are blanked (the note is recruiter-internal, decision 16).
+
 ## Checklist (mirrors spec section 17; proof recorded in CLAUDE.md)
 See `CLAUDE.md` section 4.

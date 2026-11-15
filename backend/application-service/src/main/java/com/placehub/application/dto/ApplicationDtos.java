@@ -34,7 +34,7 @@ public final class ApplicationDtos {
                                       String branch, BigDecimal cgpa, int graduationYear, int backlogCount,
                                       ApplicationStatus status, String recruiterNote, Instant appliedAt,
                                       Instant updatedAt, BigDecimal ctcLpa, String employmentType,
-                                      boolean hasResume) {
+                                      boolean hasResume, String policyDecision) {
     }
 
     /**
@@ -54,5 +54,25 @@ public final class ApplicationDtos {
     }
 
     public record StatusStats(long total, Map<ApplicationStatus, Long> byStatus) {
+    }
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record HistoryEntry(ApplicationStatus fromStatus, ApplicationStatus toStatus, String actorType,
+                               UUID actorUserId, String reason, Instant changedAt) {
+    }
+
+    public record BulkStatusRequest(@jakarta.validation.constraints.NotEmpty @Size(max = 100) List<@NotNull UUID> applicationIds,
+                                    @NotNull ApplicationStatus status, @Size(max = 1000) String note) {
+    }
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record BulkItem(UUID applicationId, boolean success, ApplicationStatus status, String code,
+                           String message) {
+    }
+
+    public record BulkResult(List<BulkItem> results, long succeeded, long failed) {
+    }
+
+    public record AutoScreenResult(int shortlisted, int evaluated) {
     }
 }

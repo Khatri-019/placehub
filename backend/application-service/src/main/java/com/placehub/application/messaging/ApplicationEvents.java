@@ -19,7 +19,8 @@ public final class ApplicationEvents {
 
     public record ApplicationCreated(UUID eventId, String eventType, int eventVersion, Instant occurredAt,
                                      UUID applicationId, UUID jobId, UUID studentUserId, String studentName,
-                                     UUID recruiterUserId, String jobTitle, String companyName) {
+                                     UUID recruiterUserId, String jobTitle, String companyName,
+                                     Boolean autoShortlisted) {
     }
 
     public record ApplicationStatusChanged(UUID eventId, String eventType, int eventVersion, Instant occurredAt,
