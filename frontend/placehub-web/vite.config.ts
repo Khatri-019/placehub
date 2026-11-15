@@ -7,6 +7,7 @@ export default defineConfig({
   server: { port: 5173 },
   test: {
     environment: 'jsdom',
+    include: ['src/**/*.test.{ts,tsx}'],
     globals: true,
     setupFiles: ['./src/setupTests.ts'],
     css: { modules: { classNameStrategy: 'non-scoped' } },

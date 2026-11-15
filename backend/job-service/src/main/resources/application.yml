@@ -52,6 +52,14 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+      probes:
+        enabled: true
+      group:
+        # Liveness never depends on Kafka, Mongo, DB or Eureka: a dependency outage must not get the JVM restarted.
+        liveness:
+          include: livenessState,ping
+        readiness:
+          include: readinessState,db
 
 springdoc:
   swagger-ui:
