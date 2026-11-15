@@ -15,7 +15,7 @@ public interface OutboxRepository extends JpaRepository<OutboxEvent, UUID> {
     @Query(value = """
             SELECT * FROM outbox_events
              WHERE status = 'PENDING' AND next_attempt_at <= :now
-             ORDER BY created_at
+             ORDER BY seq
              LIMIT :limit
              FOR UPDATE SKIP LOCKED""", nativeQuery = true)
     List<OutboxEvent> lockDueBatch(@Param("now") Instant now, @Param("limit") int limit);

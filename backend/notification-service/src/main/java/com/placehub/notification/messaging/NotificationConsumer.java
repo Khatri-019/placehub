@@ -50,6 +50,16 @@ public class NotificationConsumer {
         });
     }
 
+    @KafkaListener(topics = ApplicationEvents.PLACEMENT_TOPIC, groupId = "notification-service")
+    public void onPlacement(ConsumerRecord<String, String> record) {
+        withCorrelation(record, () -> {
+            var event = parser.parsePlacement(record.value());
+            int stored = notifications.store(NotificationFactory.forPlacement(event, clock.instant()));
+            log.info("Processed {} event {} for student {} ({} new notifications)", event.eventType(), event.eventId(),
+                    event.studentUserId(), stored);
+        });
+    }
+
     private static void withCorrelation(ConsumerRecord<String, String> record, Runnable work) {
         Header header = record.headers().lastHeader(CorrelationIdFilter.HEADER);
         if (header != null) {

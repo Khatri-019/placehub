@@ -70,6 +70,21 @@ public class Application {
     @Column(name = "resume_id_snapshot")
     private UUID resumeIdSnapshot;
 
+    @Column(name = "policy_version_snapshot")
+    private Integer policyVersionSnapshot;
+
+    @Column(name = "policy_decision_snapshot", length = 20)
+    private String policyDecisionSnapshot;
+
+    @Column(name = "ratio_snapshot", precision = 8, scale = 2)
+    private BigDecimal ratioSnapshot;
+
+    @Column(name = "policy_band_snapshot", length = 120)
+    private String policyBandSnapshot;
+
+    @Column(name = "lock_on_placement_snapshot", nullable = false)
+    private boolean lockOnPlacementSnapshot;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ApplicationStatus status;
@@ -120,6 +135,35 @@ public class Application {
     }
 
     /** Job compensation snapshot taken at apply time (spec 20.1); never changes afterwards. */
+    /** Placement policy outcome at apply time (spec 20.3); never changes when the policy changes later. */
+    public void snapshotPolicy(int version, String decision, BigDecimal ratio, String band, boolean lockOnPlacement) {
+        this.policyVersionSnapshot = version;
+        this.policyDecisionSnapshot = decision;
+        this.ratioSnapshot = ratio;
+        this.policyBandSnapshot = band;
+        this.lockOnPlacementSnapshot = lockOnPlacement;
+    }
+
+    public Integer getPolicyVersionSnapshot() {
+        return policyVersionSnapshot;
+    }
+
+    public String getPolicyDecisionSnapshot() {
+        return policyDecisionSnapshot;
+    }
+
+    public BigDecimal getRatioSnapshot() {
+        return ratioSnapshot;
+    }
+
+    public String getPolicyBandSnapshot() {
+        return policyBandSnapshot;
+    }
+
+    public boolean isLockOnPlacementSnapshot() {
+        return lockOnPlacementSnapshot;
+    }
+
     public void snapshotResume(UUID resumeId) {
         this.resumeIdSnapshot = resumeId;
     }

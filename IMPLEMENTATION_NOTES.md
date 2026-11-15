@@ -155,5 +155,42 @@ Longer rationale for decisions. Operational status lives in `CLAUDE.md`; the spe
     authenticated blob fetch (bearer header, no token in the URL, `application/pdf`, `nosniff`) and the popup, not
     the popup's URL. The admin jobs test searches instead of expecting the seeded job on page 1.
 
+### 9.3 Placement policy engine
+42. **Package and storage.** `com.placehub.application.policy` (pure `PolicyModel`, `PolicyEvaluator`,
+    `PolicyValidator`, `ConsentText`; services; entities). Bands are stored as JSON text on the version row.
+    Repositories are nested interfaces, so `@EnableJpaRepositories(considerNestedRepositories = true)` is set
+    explicitly. The default policy v1 is a versioned migration (V4) with a fixed id, not dev-only seed data. A partial
+    unique index guarantees exactly one active version.
+43. **Evaluator rules** (order): locked → BLOCK; internship not covered → ALLOW; missing CTC → BLOCK; unplaced →
+    ALLOW; otherwise the band matched with exact arithmetic (`job >= current*from`, `job < current*to`). The ratio is
+    reported rounded HALF_UP to 2 decimals but never used for matching (17.99/12 rounds to 1.50 and is still BLOCK).
+44. **Apply pipeline** (`ApplyRequirements`, shared with the preview): Job Service eligibility → resume
+    (`policy.resumeRequired`) → policy (lock, band, consent, consent limit) → one 422 with every violation → duplicate
+    pre-check (409) → persist; the DB unique constraint remains the final guard. A pending consent does not make
+    `canApply` false in the preview, because consent is given in the apply request.
+45. **Consent.** Valid only when `accepted == true` and the signed name matches the student's full name (trimmed,
+    case-insensitive, whitespace collapsed). The record stores the rendered text and its sha256, the band label, the
+    policy version, the last `X-Forwarded-For` entry and the user agent. It is created inside `ApplicationWriter.create`
+    after the application row exists, so both commit together. Consent sent for a non-consent band is ignored.
+    Because consent is bound to the `jobId` of the same request, it cannot be replayed onto another job.
+46. **Selection and locking.** `ApplicationWriter.changeStatus(...SELECTED)` calls `PlacementService.recordOnCampus`
+    (MANDATORY propagation) for FULL_TIME applications. The lock decision uses the application's
+    `lockOnPlacementSnapshot` (the band at apply time), so policy edits never change an existing application. A first
+    placement (unplaced → no band) never locks. Withdrawals of the other non-terminal applications run in the same
+    transaction as SYSTEM, each with a history row and a status-changed event (`actorType: SYSTEM`, `reason`,
+    `changedByUserId: null`). They follow the *active* policy's `withdrawOtherApplicationsOnLock`.
+47. **Events.** Status-changed gains the optional `actorType` and `reason`; the fixture was updated and
+    `eventVersion` stays 1. A new topic `placehub.placement.recorded.v1` (key studentUserId) and DLT, with fixture
+    `contracts/events/placement-recorded.v1.json` and contract tests on both sides. Outbox rows are relayed `ORDER BY
+    seq` (new BIGSERIAL), because one transaction can write several events with the same timestamp.
+48. **Admin endpoints** live under `/api/admin/{policy,placements,students,consents}`, all routed by the gateway to
+    application-service. The class-level `@PreAuthorize("hasRole('ADMIN')")` covers them all. The consent CSV is
+    RFC 4180-quoted with formula-injection protection (a leading `= + - @ \t \r` gets a `'` prefix).
+49. **Status history pulled forward from 9.4** (V5), because policy withdrawals must record SYSTEM transitions.
+    History is ordered by `seq`.
+50. **Deviation: UI timing.** The 9.3–9.5 frontend (policy editor, simulator, placements, consents, consent modal,
+    placement banner, policy badges, bulk actions, portals) is built in the 9.6 redesign, so no page is built twice.
+    Backend behaviour was verified per sub-phase through tests and the gateway.
+
 ## Checklist (mirrors spec section 17; proof recorded in CLAUDE.md)
 See `CLAUDE.md` section 4.

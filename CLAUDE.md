@@ -59,7 +59,13 @@ Phase 9 (v3, BUILD_SPEC §20):
       409 delete, owner-scoped internal stream, other student 404, recruiter 403); ApplicationServiceTest +4 (IDOR
       outsiders 404 first, snapshot + pin, RESUME_REQUIRED with NOT_ELIGIBLE in one 422); ApplicationServiceIT +2;
       Gateway 1 MB / 2.2 MB RequestSize test; smoke 35/35; Playwright 10/10 (resume.spec 2)
-- [ ] 9.3 Placement policy engine (versions, evaluator, consent, placements, locks, audit, admin UI)
+- [x] 9.3 Placement policy (backend) — app V4 (policies + seeded v1, states, placements, consents, audit, snapshots,
+      outbox seq) + V5 history; PolicyEvaluatorTest 19 (12 boundary rows), PolicyValidatorTest 5,
+      ConsentAndSummaryTest 5, ApplicationServiceTest +7 policy cases; PolicyFlowIT 2 (consent 422/201 + row,
+      lock-band selection → lock + SYSTEM withdrawals + placement events, STUDENT_LOCKED, unlock audited, CSV,
+      403s, versioning keeps snapshots); notification +5 (placement topic, SYSTEM wording); app verify 152 tests;
+      compose: policy v1 active, simulate 12→20 = REQUIRE_CONSENT 1.67; smoke 35/35; Playwright 10/10.
+      Policy UI (admin pages, consent modal, banner, badges) is delivered with the 9.6 redesign
 - [ ] 9.4 Auto-shortlisting, status history, bulk status, auto-screen
 - [ ] 9.5 Separate login portals (backend portal check + UI routes)
 - [ ] 9.6 UI redesign (tokens, components, lazy routes, size budget, Lighthouse, dark theme)
@@ -69,7 +75,7 @@ Phase 9 (v3, BUILD_SPEC §20):
 Definition of Done (v2 §17): all [x] (see git history of this file). Frontend click-through gap closes with Playwright.
 
 ## 5. Current state
-- Phase 9.3 (placement policy engine) next. Stack running with 9.2 images.
+- Phase 9.4 (auto-shortlist backend) next. Stack running with 9.3 images. Frontend for 9.3-9.5 is built in 9.6.
 
 ## 6. Known issues / deviations from spec
 - Java 25 instead of 21 (user edit). VS Code redhat.java may race on `target/` → rerun `./mvnw clean verify`.

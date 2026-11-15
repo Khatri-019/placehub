@@ -12,5 +12,7 @@
   "companyName": "Northstar Technologies",
   "oldStatus": "APPLIED",
   "newStatus": "SHORTLISTED",
-  "changedByUserId": "00000000-0000-0000-0000-000000000002"
+  "changedByUserId": "00000000-0000-0000-0000-000000000002",
+  "actorType": "USER",
+  "reason": null
 }

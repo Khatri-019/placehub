@@ -1,6 +1,7 @@
 package com.placehub.application.config;
 
 import com.placehub.application.messaging.ApplicationEvents;
+import com.placehub.application.policy.PolicyEvaluator;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,6 +22,16 @@ public class MessagingConfig {
     @Bean
     public NewTopic applicationCreatedTopic() {
         return TopicBuilder.name(ApplicationEvents.CREATED_TOPIC).partitions(3).replicas(1).build();
+    }
+
+    @Bean
+    public NewTopic placementRecordedTopic() {
+        return TopicBuilder.name(ApplicationEvents.PLACEMENT_TOPIC).partitions(3).replicas(1).build();
+    }
+
+    @Bean
+    public PolicyEvaluator policyEvaluator(Clock clock) {
+        return new PolicyEvaluator(clock);
     }
 
     @Bean

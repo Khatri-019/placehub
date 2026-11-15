@@ -1,0 +1,14 @@
+{
+  "eventId": "4c3b2a19-0f8e-4d7c-9b6a-5e4f3d2c1b0a",
+  "eventType": "STUDENT_PLACEMENT_RECORDED",
+  "eventVersion": 1,
+  "occurredAt": "2026-01-02T09:30:00Z",
+  "placementId": "6d5c4b3a-2918-4f7e-8d6c-5b4a39281706",
+  "studentUserId": "00000000-0000-0000-0000-000000000003",
+  "studentName": "Demo Student",
+  "applicationId": "5b0d1e7a-3c2f-4e8b-a9d6-1f2e3d4c5b6a",
+  "companyName": "Meridian Analytics",
+  "ctcLpa": 20.00,
+  "locked": true,
+  "source": "ON_CAMPUS"
+}

@@ -45,13 +45,32 @@ public class OutboxWriter {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public OutboxEvent statusChanged(Application a, ApplicationStatus oldStatus, UUID changedBy) {
+        return statusChanged(a, oldStatus, changedBy, "USER", null);
+    }
+
+    /** {@code actorType} USER or SYSTEM (additive v3 field); SYSTEM changes carry a null changedByUserId. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public OutboxEvent statusChanged(Application a, ApplicationStatus oldStatus, UUID changedBy, String actorType,
+                                     String reason) {
         UUID eventId = UUID.randomUUID();
         Instant now = clock.instant();
         var event = new ApplicationEvents.ApplicationStatusChanged(eventId, ApplicationEvents.STATUS_CHANGED,
                 ApplicationEvents.VERSION, now, a.getId(), a.getJobId(), a.getStudentUserId(),
                 a.getStudentNameSnapshot(), a.getRecruiterOwnerUserId(), a.getJobTitleSnapshot(),
-                a.getCompanyNameSnapshot(), oldStatus.name(), a.getStatus().name(), changedBy);
+                a.getCompanyNameSnapshot(), oldStatus.name(), a.getStatus().name(),
+                "SYSTEM".equals(actorType) ? null : changedBy, actorType, reason);
         return save(eventId, a.getId(), ApplicationEvents.STATUS_CHANGED, ApplicationEvents.STATUS_CHANGED_TOPIC,
+                event, now);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public OutboxEvent placementRecorded(com.placehub.application.policy.Placement p) {
+        UUID eventId = UUID.randomUUID();
+        Instant now = clock.instant();
+        var event = new ApplicationEvents.StudentPlacementRecorded(eventId, ApplicationEvents.PLACEMENT_RECORDED,
+                ApplicationEvents.VERSION, now, p.getId(), p.getStudentUserId(), p.getStudentName(),
+                p.getApplicationId(), p.getCompanyName(), p.getCtcLpa(), p.isLocked(), p.getSource().name());
+        return save(eventId, p.getStudentUserId(), ApplicationEvents.PLACEMENT_RECORDED, ApplicationEvents.PLACEMENT_TOPIC,
                 event, now);
     }
 

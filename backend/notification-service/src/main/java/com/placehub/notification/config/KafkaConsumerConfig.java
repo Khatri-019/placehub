@@ -48,6 +48,17 @@ public class KafkaConsumerConfig {
     }
 
     @Bean
+    public NewTopic placementTopic() {
+        return TopicBuilder.name(ApplicationEvents.PLACEMENT_TOPIC).partitions(3).replicas(1).build();
+    }
+
+    @Bean
+    public NewTopic placementDeadLetterTopic() {
+        return TopicBuilder.name(ApplicationEvents.PLACEMENT_TOPIC + ApplicationEvents.DLT_SUFFIX).partitions(3)
+                .replicas(1).build();
+    }
+
+    @Bean
     public NewTopic createdDeadLetterTopic() {
         return TopicBuilder.name(ApplicationEvents.CREATED_TOPIC + ApplicationEvents.DLT_SUFFIX).partitions(3)
                 .replicas(1).build();

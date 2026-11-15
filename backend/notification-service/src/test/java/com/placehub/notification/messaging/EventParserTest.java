@@ -39,6 +39,26 @@ class EventParserTest {
     }
 
     @Test
+    void placementFixtureDeserializes() throws Exception {
+        var e = parser.parsePlacement(fixture("placement-recorded.v1.json"));
+        assertThat(e.companyName()).isEqualTo("Meridian Analytics");
+        assertThat(e.locked()).isTrue();
+        assertThat(e.ctcLpa()).isEqualByComparingTo("20.00");
+        assertThatThrownBy(() -> parser.parsePlacement(fixture("application-created.v1.json")))
+                .isInstanceOf(InvalidEventException.class);
+    }
+
+    @Test
+    void v1EventsWithoutTheNewOptionalFieldsStillParse() throws Exception {
+        ObjectNode node = (ObjectNode) json.readTree(fixture("application-status-changed.v1.json"));
+        node.remove("actorType");
+        node.remove("reason");
+        var e = parser.parseStatusChanged(node.toString());
+        assertThat(e.bySystem()).isFalse();
+        assertThat(parser.parseCreated(fixture("application-created.v1.json")).wasAutoShortlisted()).isFalse();
+    }
+
+    @Test
     void missingEventIdIsInvalid() throws Exception {
         ObjectNode node = (ObjectNode) json.readTree(fixture("application-created.v1.json"));
         node.remove("eventId");

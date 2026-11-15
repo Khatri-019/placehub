@@ -35,7 +35,17 @@ public class EventParser {
         return convert(node, ApplicationEvents.ApplicationStatusChanged.class);
     }
 
+    public ApplicationEvents.StudentPlacementRecorded parsePlacement(String json) {
+        JsonNode node = validate(json, ApplicationEvents.PLACEMENT_RECORDED,
+                List.of("placementId", "studentUserId", "companyName"), List.of("eventId", "eventType", "eventVersion"));
+        return convert(node, ApplicationEvents.StudentPlacementRecorded.class);
+    }
+
     private JsonNode validate(String json, String expectedType, List<String> extraRequired) {
+        return validate(json, expectedType, extraRequired, COMMON_REQUIRED);
+    }
+
+    private JsonNode validate(String json, String expectedType, List<String> extraRequired, List<String> required) {
         JsonNode node;
         try {
             node = json == null ? null : jsonMapper.readTree(json);
@@ -45,7 +55,7 @@ public class EventParser {
         if (node == null || !node.isObject()) {
             throw new InvalidEventException("Event payload must be a JSON object");
         }
-        for (String field : COMMON_REQUIRED) {
+        for (String field : required) {
             requireText(node, field);
         }
         for (String field : extraRequired) {

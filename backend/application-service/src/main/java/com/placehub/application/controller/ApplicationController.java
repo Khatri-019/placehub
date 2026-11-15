@@ -39,8 +39,13 @@ public class ApplicationController {
     @PostMapping("/api/applications")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<ApplicationResponse> apply(@AuthenticationPrincipal Jwt jwt,
-                                                     @Valid @RequestBody ApplyRequest request) {
-        ApplicationResponse created = service.apply(AuthUser.from(jwt), request.jobId());
+                                                     @Valid @RequestBody ApplyRequest request,
+                                                     jakarta.servlet.http.HttpServletRequest http) {
+        var consent = request.consent() == null ? null
+                : new com.placehub.application.service.ApplyRequirements.ConsentInput(request.consent().accepted(),
+                request.consent().signedName());
+        ApplicationResponse created = service.apply(AuthUser.from(jwt), request.jobId(), consent,
+                new ApplicationService.ClientInfo(clientIp(http), http.getHeader("User-Agent")));
         return ResponseEntity.created(URI.create("/api/applications/" + created.id())).body(created);
     }
 
@@ -58,6 +63,25 @@ public class ApplicationController {
                                                   @RequestParam(required = false) Integer size,
                                                   @RequestParam(required = false) String sort) {
         return service.mine(AuthUser.from(jwt), status, page, size, sort);
+    }
+
+    @GetMapping("/api/applications/me/placement-state")
+    @PreAuthorize("hasRole('STUDENT')")
+    public com.placehub.application.policy.PolicyDtos.PlacementStateView placementState(@AuthenticationPrincipal Jwt jwt) {
+        return service.placementState(AuthUser.from(jwt));
+    }
+
+    /**
+     * The address the gateway saw is the last X-Forwarded-For entry (the gateway appends it); anything before it was
+     * supplied by the client and is not trusted.
+     */
+    static String clientIp(jakarta.servlet.http.HttpServletRequest http) {
+        String xff = http.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isBlank()) {
+            String[] parts = xff.split(",");
+            return parts[parts.length - 1].trim();
+        }
+        return http.getRemoteAddr();
     }
 
     @GetMapping("/api/applications/stats/me")

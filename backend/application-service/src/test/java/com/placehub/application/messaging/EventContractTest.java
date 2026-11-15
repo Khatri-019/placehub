@@ -34,6 +34,21 @@ class EventContractTest {
         var event = json.treeToValue(expected, ApplicationEvents.ApplicationStatusChanged.class);
         assertThat(event.eventType()).isEqualTo(ApplicationEvents.STATUS_CHANGED);
         assertThat(event.newStatus()).isEqualTo("SHORTLISTED");
+        assertThat(event.actorType()).isEqualTo("USER");
         assertThat(json.readTree(json.writeValueAsString(event))).isEqualTo(expected);
+    }
+
+    @Test
+    void placementRecordedMatchesContract() throws Exception {
+        JsonNode expected = fixture("placement-recorded.v1.json");
+        var event = json.treeToValue(expected, ApplicationEvents.StudentPlacementRecorded.class);
+        assertThat(event.eventType()).isEqualTo(ApplicationEvents.PLACEMENT_RECORDED);
+        assertThat(event.locked()).isTrue();
+        assertThat(event.ctcLpa()).isEqualByComparingTo("20.00");
+        var actual = (tools.jackson.databind.node.ObjectNode) json.readTree(json.writeValueAsString(event));
+        var fixture = (tools.jackson.databind.node.ObjectNode) expected.deepCopy();
+        // Decimal formatting (20.00 vs 20.0) is not part of the contract; the value is.
+        assertThat(actual.remove("ctcLpa").decimalValue()).isEqualByComparingTo(fixture.remove("ctcLpa").decimalValue());
+        assertThat(actual).isEqualTo(fixture);
     }
 }

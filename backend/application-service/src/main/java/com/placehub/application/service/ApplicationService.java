@@ -19,7 +19,14 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import com.placehub.application.policy.Consent;
+import com.placehub.application.policy.ConsentText;
+import com.placehub.application.policy.PlacementService;
+import com.placehub.application.policy.PolicyDtos;
+
+import java.time.Clock;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -42,42 +49,68 @@ public class ApplicationService {
     private final ApplicationRepository applications;
     private final ApplicationWriter writer;
     private final DependencyGateway dependencies;
+    private final ApplyRequirements requirements;
+    private final PlacementService placements;
+    private final Clock clock;
 
     public ApplicationService(ApplicationRepository applications, ApplicationWriter writer,
-                              DependencyGateway dependencies) {
+                              DependencyGateway dependencies, ApplyRequirements requirements,
+                              PlacementService placements, Clock clock) {
         this.applications = applications;
         this.writer = writer;
         this.dependencies = dependencies;
+        this.requirements = requirements;
+        this.placements = placements;
+        this.clock = clock;
+    }
+
+    /** Client details recorded with a consent (forwarded by the gateway). */
+    public record ClientInfo(String ip, String userAgent) {
+        public static final ClientInfo NONE = new ClientInfo(null, null);
     }
 
     // ------------------------------------------------------------------ student
 
-    /** Resume requirement; 9.3 replaces this constant with the active placement policy's resumeRequired. */
-    static final boolean RESUME_REQUIRED_DEFAULT = true;
-
     public ApplicationResponse apply(AuthUser student, UUID jobId) {
+        return apply(student, jobId, null, ClientInfo.NONE);
+    }
+
+    /**
+     * Apply flow (spec 20.3): eligibility, resume, placement policy and consent are all checked and every failure is
+     * returned in one 422; then the duplicate check; then the application (+ consent) is persisted atomically.
+     */
+    public ApplicationResponse apply(AuthUser student, UUID jobId, ApplyRequirements.ConsentInput consent,
+                                     ClientInfo client) {
         requireStudent(student);
         ClientDtos.AcademicProfile profile = activeProfile(student);
-        ClientDtos.EligibilityResult result = dependencies.validateEligibility(jobId, toCheck(profile));
-        Violations violations = new Violations();
-        if (!result.eligible()) {
-            violations.addAll(Violations.Code.NOT_ELIGIBLE, result.reasons() == null ? List.of() : result.reasons());
+        ApplyRequirements.Assessment a = requirements.assess(student.id(), profile, jobId, consent);
+        a.violations().throwIfAny();
+        if (applications.existsByJobIdAndStudentUserId(jobId, student.id())) {
+            throw ApiException.conflict(ALREADY_APPLIED);
         }
-        if (RESUME_REQUIRED_DEFAULT && profile.currentResumeId() == null) {
-            violations.add(Violations.Code.RESUME_REQUIRED, Violations.RESUME_REQUIRED_MESSAGE);
-        }
-        violations.throwIfAny();
-        ClientDtos.JobSummary job = dependencies.jobSummary(jobId);
+        ClientDtos.JobSummary job = a.job();
         Application application = new Application(UUID.randomUUID(), jobId, student.id(),
                 job.recruiterOwnerUserId(), job.title(), job.companyName(), profile.fullName(), profile.email(),
                 profile.branch(), profile.cgpa(), profile.graduationYear(), profile.backlogCount());
         application.snapshotJobTerms(job.ctcLpa(), job.employmentType());
+        var ev = a.evaluation();
+        application.snapshotPolicy(ev.policyVersion(), ev.decision().name(), ev.ratio(),
+                ev.matchedBand() == null ? null : ev.matchedBand().label(), ev.lockOnPlacement());
         if (profile.currentResumeId() != null) {
             application.snapshotResume(profile.currentResumeId());
             dependencies.referenceResume(student.id(), profile.currentResumeId());
         }
+        ApplicationWriter.ConsentFactory consentRecord = null;
+        if (a.consentNeeded() && a.consentAccepted()) {
+            String rendered = a.renderedConsent();
+            String band = ev.matchedBand() == null ? "" : ev.matchedBand().label();
+            String signed = consent.signedName().trim();
+            consentRecord = appId -> new Consent(UUID.randomUUID(), appId, student.id(), jobId, ev.policyVersion(),
+                    band, ConsentText.sha256(rendered), rendered, signed, clock.instant(),
+                    truncate(client.ip(), 64), truncate(client.userAgent(), 512));
+        }
         try {
-            return ApplicationMapper.toResponse(writer.create(application), false);
+            return ApplicationMapper.toResponse(writer.create(application, consentRecord), false);
         } catch (DataIntegrityViolationException e) {
             throw ApiException.conflict(ALREADY_APPLIED);
         }
@@ -86,19 +119,28 @@ public class ApplicationService {
     public EligibilityPreview preview(AuthUser student, UUID jobId) {
         requireStudent(student);
         ClientDtos.AcademicProfile profile = activeProfile(student);
-        ClientDtos.EligibilityResult result = dependencies.validateEligibility(jobId, toCheck(profile));
+        ApplyRequirements.Assessment a = requirements.assess(student.id(), profile, jobId, null);
         boolean alreadyApplied = applications.existsByJobIdAndStudentUserId(jobId, student.id());
-        List<String> reasons = result.reasons() == null ? List.of() : result.reasons();
-        boolean hasResume = profile.currentResumeId() != null;
-        Violations violations = new Violations();
-        violations.addAll(Violations.Code.NOT_ELIGIBLE, reasons);
-        if (RESUME_REQUIRED_DEFAULT && !hasResume) {
-            violations.add(Violations.Code.RESUME_REQUIRED, Violations.RESUME_REQUIRED_MESSAGE);
-        }
-        List<Map<String, String>> codes = violations.list().stream()
+        List<String> reasons = a.eligibility().reasons() == null ? List.of() : a.eligibility().reasons();
+        List<Map<String, String>> codes = a.violations().list().stream()
                 .map(v -> Map.of("code", v.code().name(), "message", v.message())).toList();
-        return new EligibilityPreview(jobId, result.eligible(), reasons, alreadyApplied, RESUME_REQUIRED_DEFAULT,
-                hasResume, violations.isEmpty() && !alreadyApplied, codes, null, null, null);
+        // Consent is given at apply time, so a pending consent does not stop the student from proceeding.
+        boolean blocking = a.violations().list().stream()
+                .anyMatch(v -> v.code() != Violations.Code.CONSENT_REQUIRED);
+        var view = placements.view(student.id());
+        Map<String, Object> placementState = new LinkedHashMap<>();
+        placementState.put("currentCtc", view.currentCtc());
+        placementState.put("placed", view.placed());
+        placementState.put("locked", view.locked());
+        placementState.put("summary", view.summary());
+        return new EligibilityPreview(jobId, a.eligibility().eligible(), reasons, alreadyApplied,
+                a.rules().resumeRequired(), profile.currentResumeId() != null, !blocking && !alreadyApplied, codes,
+                PolicyDtos.EvaluationDto.of(a.evaluation()), a.consentDetails(), placementState);
+    }
+
+    public PolicyDtos.PlacementStateView placementState(AuthUser student) {
+        requireStudent(student);
+        return placements.view(student.id());
     }
 
     public PageResponse<ApplicationResponse> mine(AuthUser student, ApplicationStatus status, Integer page,
@@ -214,8 +256,8 @@ public class ApplicationService {
         return profile;
     }
 
-    private static ClientDtos.EligibilityCheck toCheck(ClientDtos.AcademicProfile p) {
-        return new ClientDtos.EligibilityCheck(p.branch(), p.graduationYear(), p.cgpa(), p.backlogCount());
+    private static String truncate(String s, int max) {
+        return s == null ? null : s.length() <= max ? s : s.substring(0, max);
     }
 
     static void requireTransition(ApplicationStatus from, ApplicationStatus to) {

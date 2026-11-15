@@ -13,6 +13,15 @@ public interface ApplicationRepository extends JpaRepository<Application, UUID>,
 
     boolean existsByJobIdAndStudentUserId(UUID jobId, UUID studentUserId);
 
+    List<Application> findByStudentUserId(UUID studentUserId);
+
+    /** Non-terminal applications that went through the consent band (for maxActiveConsents). */
+    @Query("select count(a) from Application a where a.studentUserId = :id and a.policyDecisionSnapshot = 'REQUIRE_CONSENT'"
+            + " and a.status in (com.placehub.application.domain.ApplicationStatus.APPLIED,"
+            + " com.placehub.application.domain.ApplicationStatus.UNDER_REVIEW,"
+            + " com.placehub.application.domain.ApplicationStatus.SHORTLISTED)")
+    long countActiveConsentApplications(@Param("id") UUID studentId);
+
     /** Rows of [status, count]. */
     @Query("select a.status, count(a) from Application a where a.studentUserId = :id group by a.status")
     List<Object[]> countByStatusForStudent(@Param("id") UUID studentId);

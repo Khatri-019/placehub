@@ -18,7 +18,11 @@ public final class ApplicationDtos {
     }
 
     /** Only the job id is accepted; identity and academic data never come from the client. */
-    public record ApplyRequest(@NotNull UUID jobId) {
+    public record ApplyRequest(@NotNull UUID jobId, @jakarta.validation.Valid ConsentRequest consent) {
+    }
+
+    /** Consent for jobs in a REQUIRE_CONSENT band (spec 20.3). */
+    public record ConsentRequest(Boolean accepted, @Size(max = 100) String signedName) {
     }
 
     public record StatusUpdateRequest(@NotNull ApplicationStatus status, @Size(max = 1000) String note) {

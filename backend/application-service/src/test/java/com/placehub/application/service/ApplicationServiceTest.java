@@ -13,7 +13,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 
+import com.placehub.application.policy.PlacementService;
+import com.placehub.application.policy.PolicyEvaluator;
+import com.placehub.application.policy.PolicyModel;
+import com.placehub.application.policy.PolicyService;
+
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +49,40 @@ class ApplicationServiceTest {
     ApplicationRepository repo = mock(ApplicationRepository.class);
     ApplicationWriter writer = mock(ApplicationWriter.class);
     DependencyGateway deps = mock(DependencyGateway.class);
-    ApplicationService service = new ApplicationService(repo, writer, deps);
+    PolicyService policies = mock(PolicyService.class);
+    PlacementService placements = mock(PlacementService.class);
+    Clock clock = Clock.fixed(Instant.parse("2026-11-15T10:00:00Z"), ZoneOffset.UTC);
+    ApplyRequirements requirements = new ApplyRequirements(deps, policies, placements, new PolicyEvaluator(clock), repo);
+    ApplicationService service = new ApplicationService(repo, writer, deps, requirements, placements, clock);
+
+    static final String CONSENT = "Consent for {{jobTitle}} at {{companyName}} paying {{ctcLpa}} (now {{currentCtc}})";
+
+    static PolicyModel.Rules defaultRules(Integer maxActiveConsents, boolean internships) {
+        return new PolicyModel.Rules(1, List.of(
+                new PolicyModel.Band(BigDecimal.ZERO, new BigDecimal("1.5"), PolicyModel.Action.BLOCK, false),
+                new PolicyModel.Band(new BigDecimal("1.5"), new BigDecimal("2.0"), PolicyModel.Action.REQUIRE_CONSENT, true),
+                new PolicyModel.Band(new BigDecimal("2.0"), null, PolicyModel.Action.ALLOW, false)),
+                internships, maxActiveConsents, true, true, CONSENT, Instant.now(), null, "v1");
+    }
+
+    void jobPays(String ctc, String type) {
+        when(deps.jobSummary(jobId)).thenReturn(new ClientDtos.JobSummary(jobId, "Senior DE", UUID.randomUUID(),
+                "Meridian", recruiterId, "PUBLISHED", Instant.now().plusSeconds(3600),
+                ctc == null ? null : new BigDecimal(ctc), type));
+        when(deps.validateEligibility(eq(jobId), any())).thenReturn(
+                new ClientDtos.EligibilityResult(jobId, true, List.of()));
+    }
+
+    void placedAt(String ctc, boolean locked) {
+        when(placements.state(student.id())).thenReturn(new PolicyModel.PlacementState(
+                ctc == null ? null : new BigDecimal(ctc), locked));
+    }
+
+    @SuppressWarnings("unchecked")
+    static List<String> codes(Throwable e) {
+        return ((List<java.util.Map<String, String>>) ((ApiException) e).getDetails().get("violations")).stream()
+                .map(m -> m.get("code")).toList();
+    }
 
     final UUID resumeId = UUID.randomUUID();
 
@@ -63,11 +103,15 @@ class ApplicationServiceTest {
 
     @BeforeEach
     void setUp() {
+        when(policies.activeRules()).thenReturn(defaultRules(null, false));
+        when(placements.state(any())).thenReturn(PolicyModel.PlacementState.UNPLACED);
+        when(placements.view(any())).thenReturn(new com.placehub.application.policy.PolicyDtos.PlacementStateView(
+                null, false, false, null, List.of(), 1, Instant.now(), false, List.of(), "not placed"));
         when(deps.academicProfile(student.id())).thenReturn(profile("ACTIVE"));
         when(deps.jobSummary(jobId)).thenReturn(new ClientDtos.JobSummary(jobId, "Graduate SE", UUID.randomUUID(),
                 "Northstar", recruiterId, "PUBLISHED", Instant.now().plusSeconds(3600), new BigDecimal("12.00"),
                 "FULL_TIME"));
-        when(writer.create(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(writer.create(any(), any())).thenAnswer(inv -> inv.getArgument(0));
         when(writer.changeStatus(any(), any(), any(), any())).thenAnswer(inv -> {
             Application a = inv.getArgument(0);
             a.changeStatus(inv.getArgument(1), inv.getArgument(2));
@@ -92,7 +136,7 @@ class ApplicationServiceTest {
         assertThat(res.studentUserId()).isEqualTo(student.id());
         assertThat(res.ctcLpa()).isEqualByComparingTo("12.00");
         assertThat(res.employmentType()).isEqualTo("FULL_TIME");
-        verify(writer).create(any());
+        verify(writer).create(any(), any());
     }
 
     @Test
@@ -109,7 +153,7 @@ class ApplicationServiceTest {
                     assertThat((List<String>) details.get("reasons"))
                             .containsExactly("Minimum CGPA required is 7.50; yours is 6.90");
                 });
-        verify(writer, never()).create(any());
+        verify(writer, never()).create(any(), any());
     }
 
     @Test
@@ -120,7 +164,7 @@ class ApplicationServiceTest {
         assertThat(res.hasResume()).isTrue();
         verify(deps).referenceResume(student.id(), resumeId);
         org.mockito.ArgumentCaptor<Application> saved = org.mockito.ArgumentCaptor.forClass(Application.class);
-        verify(writer).create(saved.capture());
+        verify(writer).create(saved.capture(), any());
         assertThat(saved.getValue().getResumeIdSnapshot()).isEqualTo(resumeId);
     }
 
@@ -140,7 +184,7 @@ class ApplicationServiceTest {
                     assertThat((List<Map<String, String>>) d.get("violations")).extracting(m -> m.get("code"))
                             .containsExactly("NOT_ELIGIBLE", "RESUME_REQUIRED");
                 });
-        verify(writer, never()).create(any());
+        verify(writer, never()).create(any(), any());
         verify(deps, never()).referenceResume(any(), any());
     }
 
@@ -175,11 +219,118 @@ class ApplicationServiceTest {
                 .satisfies(e -> assertThat(status(e)).isEqualTo(HttpStatus.NOT_FOUND));
     }
 
+    // ---------------------------------------------------------------- placement policy in the apply flow
+
+    @Test
+    void consentBandWithoutConsentIs422ConsentRequiredWithRenderedText() {
+        placedAt("12.00", false);
+        jobPays("20.00", "FULL_TIME"); // ratio 1.67
+        assertThatThrownBy(() -> service.apply(student, jobId, null, ApplicationService.ClientInfo.NONE))
+                .satisfies(e -> {
+                    assertThat(status(e)).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+                    assertThat(codes(e)).containsExactly("CONSENT_REQUIRED");
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> consent = (Map<String, Object>) ((ApiException) e).getDetails().get("consent");
+                    assertThat(consent.get("renderedText"))
+                            .isEqualTo("Consent for Senior DE at Meridian paying 20.00 (now 12.00)");
+                    assertThat(consent.get("band")).isEqualTo("[1.50, 2.00) REQUIRE_CONSENT lock");
+                });
+        verify(writer, never()).create(any(), any());
+    }
+
+    @Test
+    void consentWithWrongSignatureIsRejectedAndValidConsentIsStoredWithTheApplication() {
+        placedAt("12.00", false);
+        jobPays("20.00", "FULL_TIME");
+        assertThatThrownBy(() -> service.apply(student, jobId,
+                new ApplyRequirements.ConsentInput(true, "Someone Else"), ApplicationService.ClientInfo.NONE))
+                .satisfies(e -> assertThat(codes(e)).containsExactly("CONSENT_REQUIRED"))
+                .hasMessage(ApplyRequirements.CONSENT_SIGNATURE);
+        assertThatThrownBy(() -> service.apply(student, jobId,
+                new ApplyRequirements.ConsentInput(false, "Asha"), ApplicationService.ClientInfo.NONE))
+                .satisfies(e -> assertThat(codes(e)).containsExactly("CONSENT_REQUIRED"));
+
+        var res = service.apply(student, jobId, new ApplyRequirements.ConsentInput(true, "  asha "),
+                new ApplicationService.ClientInfo("10.0.0.7", "JUnit"));
+        assertThat(res.status()).isEqualTo(ApplicationStatus.APPLIED);
+        org.mockito.ArgumentCaptor<Application> app = org.mockito.ArgumentCaptor.forClass(Application.class);
+        org.mockito.ArgumentCaptor<ApplicationWriter.ConsentFactory> factory =
+                org.mockito.ArgumentCaptor.forClass(ApplicationWriter.ConsentFactory.class);
+        verify(writer).create(app.capture(), factory.capture());
+        assertThat(app.getValue().getPolicyDecisionSnapshot()).isEqualTo("REQUIRE_CONSENT");
+        assertThat(app.getValue().getRatioSnapshot()).isEqualByComparingTo("1.67");
+        assertThat(app.getValue().isLockOnPlacementSnapshot()).isTrue();
+        assertThat(app.getValue().getPolicyVersionSnapshot()).isEqualTo(1);
+        UUID appId = UUID.randomUUID();
+        var consent = factory.getValue().forApplication(appId);
+        assertThat(consent.getApplicationId()).isEqualTo(appId);
+        assertThat(consent.getStudentUserId()).isEqualTo(student.id());
+        assertThat(consent.getJobId()).isEqualTo(jobId);
+        assertThat(consent.getSignedName()).isEqualTo("asha");
+        assertThat(consent.getClientIp()).isEqualTo("10.0.0.7");
+        assertThat(consent.getConsentTextHash()).hasSize(64);
+    }
+
+    @Test
+    void lowBandIsPolicyBlockedAndLockedStudentIsStudentLocked() {
+        placedAt("12.00", false);
+        jobPays("8.00", "FULL_TIME"); // ratio 0.67
+        assertThatThrownBy(() -> service.apply(student, jobId))
+                .satisfies(e -> assertThat(codes(e)).containsExactly("POLICY_BLOCKED"));
+        placedAt("12.00", true);
+        jobPays("30.00", "FULL_TIME");
+        assertThatThrownBy(() -> service.apply(student, jobId))
+                .satisfies(e -> assertThat(codes(e)).containsExactly("STUDENT_LOCKED"));
+        verify(writer, never()).create(any(), any());
+    }
+
+    @Test
+    void openBandAndInternshipsNeedNoConsent() {
+        placedAt("12.00", false);
+        jobPays("30.00", "FULL_TIME"); // ratio 2.5
+        assertThat(service.apply(student, jobId).status()).isEqualTo(ApplicationStatus.APPLIED);
+        jobPays(null, "INTERNSHIP");
+        assertThat(service.apply(student, jobId).status()).isEqualTo(ApplicationStatus.APPLIED);
+        verify(writer, org.mockito.Mockito.times(2)).create(any(), org.mockito.ArgumentMatchers.isNull());
+    }
+
+    @Test
+    void allFailingReasonsComeBackInOne422() {
+        when(deps.academicProfile(student.id())).thenReturn(new ClientDtos.AcademicProfile(student.id(), "Asha",
+                "s@x.com", "CSE", 2027, new BigDecimal("8.60"), 0, "ACTIVE", null));
+        placedAt("12.00", false);
+        jobPays("8.00", "FULL_TIME");
+        when(deps.validateEligibility(eq(jobId), any())).thenReturn(new ClientDtos.EligibilityResult(jobId, false,
+                List.of("The application deadline has passed")));
+        assertThatThrownBy(() -> service.apply(student, jobId))
+                .satisfies(e -> assertThat(codes(e)).containsExactly("NOT_ELIGIBLE", "RESUME_REQUIRED", "POLICY_BLOCKED"));
+    }
+
+    @Test
+    void consentLimitIsEnforced() {
+        when(policies.activeRules()).thenReturn(defaultRules(1, false));
+        when(repo.countActiveConsentApplications(student.id())).thenReturn(1L);
+        placedAt("12.00", false);
+        jobPays("20.00", "FULL_TIME");
+        assertThatThrownBy(() -> service.apply(student, jobId, new ApplyRequirements.ConsentInput(true, "Asha"),
+                ApplicationService.ClientInfo.NONE))
+                .satisfies(e -> assertThat(codes(e)).containsExactly("CONSENT_LIMIT_REACHED"));
+    }
+
+    @Test
+    void duplicateIsCheckedAfterPolicyAndBeforePersisting() {
+        jobPays("12.00", "FULL_TIME");
+        when(repo.existsByJobIdAndStudentUserId(jobId, student.id())).thenReturn(true);
+        assertThatThrownBy(() -> service.apply(student, jobId))
+                .satisfies(e -> assertThat(status(e)).isEqualTo(HttpStatus.CONFLICT));
+        verify(writer, never()).create(any(), any());
+    }
+
     @Test
     void duplicateIsMappedFromTheUniqueConstraintTo409() {
         when(deps.validateEligibility(eq(jobId), any())).thenReturn(
                 new ClientDtos.EligibilityResult(jobId, true, List.of()));
-        when(writer.create(any())).thenThrow(new DataIntegrityViolationException("uq_app_job_student"));
+        when(writer.create(any(), any())).thenThrow(new DataIntegrityViolationException("uq_app_job_student"));
         assertThatThrownBy(() -> service.apply(student, jobId))
                 .hasMessage(ApplicationService.ALREADY_APPLIED)
                 .satisfies(e -> assertThat(status(e)).isEqualTo(HttpStatus.CONFLICT));
@@ -195,7 +346,7 @@ class ApplicationServiceTest {
                 .thenThrow(new DependencyUnavailableException(DependencyGateway.UNAVAILABLE));
         assertThatThrownBy(() -> service.apply(student, jobId))
                 .satisfies(e -> assertThat(status(e)).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
-        verify(writer, never()).create(any());
+        verify(writer, never()).create(any(), any());
     }
 
     @Test
