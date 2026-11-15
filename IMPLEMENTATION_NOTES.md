@@ -225,5 +225,27 @@ Longer rationale for decisions. Operational status lives in `CLAUDE.md`; the spe
 61. **Lighthouse method:** user flow (lighthouse 12.8.2 + puppeteer-core, `scripts/lighthouse/`) in one tab, because
     the session token is per-tab sessionStorage. Default mobile emulation and throttling against the nginx build.
 
+## Security review (Phase 9.7)
+
+An independent reviewer (fresh-context subagent given only the repo and the permission matrix of §2 + §20.7)
+checked the matrix live and in code. No critical or high findings. Confirmed correct: resume IDOR (owner-scoped
+lookups, 404 for outsiders), consent forgery/replay (server computes version, band, text and hash; signed name must
+match; one row per application), admin-only policy/placement/consent endpoints (gateway and direct), bulk status and
+auto-screen ownership, portal probing (403 only after a correct password, identical 401s), upload abuse (magic bytes,
+413/415, filename sanitising, attachment + nosniff), sort whitelists and LIKE escaping, hidden recruiter notes and
+consent IP/UA, gateway header stripping and `/internal` 404s. Each fix below was preceded by a failing test.
+
+| # | Severity | Finding | Resolution |
+|---|----------|---------|------------|
+| F1 | Medium | A deactivated account's token kept working until expiry (≤ 60 min) | Fixed. Gateway `AccountStatusFilter` checks the status via `/internal/users/{id}` (cached 15 s, fails open if the User Service is unreachable) and returns 401 "Your account is deactivated". Tests: `AccountStatusFilterTest` (3), `GatewaySecurityTest` +1; verified live (401 within 15 s). |
+| F2 | Medium | Service, DB, Kafka, Eureka and observability ports published on all interfaces; example secrets in use | Fixed for exposure: those ports bind to `127.0.0.1` (gateway 8080 and frontend 5173 stay public). Services log a WARN when `JWT_SECRET`/`INTERNAL_SERVICE_TOKEN` are the committed example values (`ExampleSecretsTest`). Refusing to start was rejected: the required quick start is `cp .env.example .env`. |
+| F3 | Low | Consent client IP forgeable via `X-Forwarded-For` on direct calls | Fixed. The gateway strips client-sent `X-Gateway-Token` and adds its own (internal secret); application-service uses the last XFF entry only on attested requests, the socket address otherwise. Tests: `ClientIpTest` (2), `GatewaySecurityTest` header test, `PolicyFlowIT`. |
+| F4 | Low | Single status update returns 403 (not 404) for another recruiter's application | Accepted. The v2 smoke check 14 and the spec require 403 here; ids are random UUIDs. |
+| F5 | Low | No sign-in throttling; registration reveals existing emails (409) | Throttling fixed: 10 failed sign-ins per email per 15 min → 429, unknown emails counted the same way (`LoginThrottleTest` 2, `AuthServiceTest` +1; verified live). The 409 on duplicate registration is spec behaviour and kept (would need email verification). |
+| F6 | Low | Students received `recruiterOwnerUserId` | Fixed for applications (null in the student view; `ApplicationServiceTest`). Job/company owner ids stay: the job API contract exposes them to all roles. |
+| F7 | Low | A published job's CTC/employment type could change (e.g. relabel as internship to skip the policy) | Fixed: 409 on change after publishing; the job form disables both fields (`JobServiceTest` +1). |
+| F8 | Low | Resume marked referenced before create; consent-limit check-then-insert race (suspected) | Race fixed: `ApplicationWriter` re-counts under `pg_advisory_xact_lock` per student (`ApplicationWriterConsentLimitTest` 2). The early reference mark is kept on purpose (fail-safe: worst case an unused version cannot be deleted). |
+| F9 | Info | Body validation before the role check on admin POST/PUT; public actuator/OpenAPI; no CSP; placement implied in withdrawal notices; shared HS256 secret | Fixed: URL rule `/api/admin/**` → ADMIN in the common chain (`PolicyFlowIT` +2 assertions). Accepted/documented: OpenAPI and metrics are only on loopback debug ports (gateway `/actuator/prometheus` stays for the observability profile); CSP needs the deploy-specific API origin (listed as hardening); the withdrawal wording is intended product behaviour; HS256 is the locked spec choice (RS256 + JWKS listed as hardening). |
+
 ## Checklist (mirrors spec section 17; proof recorded in CLAUDE.md)
 See `CLAUDE.md` section 4.

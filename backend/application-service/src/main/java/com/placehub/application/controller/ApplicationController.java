@@ -9,6 +9,7 @@ import com.placehub.application.dto.ApplicationDtos.StatusUpdateRequest;
 import com.placehub.application.service.ApplicationService;
 import com.placehub.common.paging.PageResponse;
 import com.placehub.common.security.AuthUser;
+import com.placehub.common.security.PlaceHubSecurityProperties;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -24,15 +25,22 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.UUID;
 
 @RestController
 @Tag(name = "applications")
 public class ApplicationController {
 
-    private final ApplicationService service;
+    /** Added by the gateway (with the internal secret) to every request it forwards; clients cannot forge it. */
+    static final String GATEWAY_HEADER = "X-Gateway-Token";
 
-    public ApplicationController(ApplicationService service) {
+    private final ApplicationService service;
+    private final String gatewayToken;
+
+    public ApplicationController(ApplicationService service, PlaceHubSecurityProperties securityProperties) {
+        this.gatewayToken = securityProperties.internalToken();
         this.service = service;
     }
 
@@ -45,7 +53,7 @@ public class ApplicationController {
                 : new com.placehub.application.service.ApplyRequirements.ConsentInput(request.consent().accepted(),
                 request.consent().signedName());
         ApplicationResponse created = service.apply(AuthUser.from(jwt), request.jobId(), consent,
-                new ApplicationService.ClientInfo(clientIp(http), http.getHeader("User-Agent")));
+                new ApplicationService.ClientInfo(clientIp(http, gatewayToken), http.getHeader("User-Agent")));
         return ResponseEntity.created(URI.create("/api/applications/" + created.id())).body(created);
     }
 
@@ -73,11 +81,16 @@ public class ApplicationController {
 
     /**
      * The address the gateway saw is the last X-Forwarded-For entry (the gateway appends it); anything before it was
-     * supplied by the client and is not trusted.
+     * supplied by the client and is not trusted. X-Forwarded-For is used only on requests the gateway attests
+     * (security review F3); a direct caller gets its socket address recorded instead.
      */
-    static String clientIp(jakarta.servlet.http.HttpServletRequest http) {
+    static String clientIp(jakarta.servlet.http.HttpServletRequest http, String expectedGatewayToken) {
         String xff = http.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isBlank()) {
+        String attest = http.getHeader(GATEWAY_HEADER);
+        boolean attested = expectedGatewayToken != null && !expectedGatewayToken.isBlank() && attest != null
+                && MessageDigest.isEqual(attest.getBytes(StandardCharsets.UTF_8),
+                expectedGatewayToken.getBytes(StandardCharsets.UTF_8));
+        if (attested && xff != null && !xff.isBlank()) {
             String[] parts = xff.split(",");
             return parts[parts.length - 1].trim();
         }

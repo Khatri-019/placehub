@@ -80,6 +80,7 @@ public class JobService {
         }
         if (job.getStatus() == JobStatus.PUBLISHED) {
             requireCtcForFullTime(req.employmentType(), req.ctcLpa());
+            requireSamePolicyTerms(job, req);
         }
         applyRequest(job, req);
         applyScreening(job, req, false);
@@ -196,6 +197,21 @@ public class JobService {
     }
 
     static final String CTC_REQUIRED = "A full-time job needs a numeric CTC (ctcLpa, lakhs per annum) to be published";
+
+    /**
+     * Once published, a job's CTC and employment type drive the placement policy for every applicant, so they are
+     * fixed (security review F7: relabelling a full-time offer as an internship would skip the bands and the lock).
+     */
+    static void requireSamePolicyTerms(Job job, JobRequest req) {
+        boolean sameType = job.getEmploymentType() == req.employmentType();
+        BigDecimal current = job.getCtcLpa();
+        BigDecimal requested = req.ctcLpa();
+        boolean sameCtc = current == null ? requested == null : requested != null && current.compareTo(requested) == 0;
+        if (!sameType || !sameCtc) {
+            throw ApiException.conflict("CTC and employment type cannot change after a job is published. "
+                    + "Close it and post a new job instead.");
+        }
+    }
 
     static void requireCtcForFullTime(EmploymentType type, BigDecimal ctcLpa) {
         if (type == EmploymentType.FULL_TIME && ctcLpa == null) {

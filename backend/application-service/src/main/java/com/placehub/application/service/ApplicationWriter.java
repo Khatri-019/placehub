@@ -56,6 +56,24 @@ public class ApplicationWriter {
      */
     @Transactional
     public Application create(Application application, ConsentFactory consent, boolean autoShortlist) {
+        return create(application, consent, autoShortlist, null);
+    }
+
+    /**
+     * As above; with a consent and a {@code consentLimit}, the policy's maxActiveConsents is re-checked here under a
+     * per-student lock (the earlier check in ApplyRequirements is unlocked; security review F8).
+     */
+    @Transactional
+    public Application create(Application application, ConsentFactory consent, boolean autoShortlist,
+                              Integer consentLimit) {
+        if (consent != null && consentLimit != null) {
+            UUID studentId = application.getStudentUserId();
+            applications.lockStudentForConsent(studentId.toString());
+            if (applications.countActiveConsentApplications(studentId) >= consentLimit) {
+                new Violations().add(Violations.Code.CONSENT_LIMIT_REACHED, "You already have " + consentLimit
+                        + " open application(s) that needed consent, the most the placement policy allows").throwIfAny();
+            }
+        }
         Application saved = applications.saveAndFlush(application);
         history.record(saved, null, ApplicationStatus.APPLIED, ActorType.USER, saved.getStudentUserId(), null);
         outbox.applicationCreated(saved, autoShortlist);

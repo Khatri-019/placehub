@@ -8,7 +8,7 @@ public final class EdgeFilterAccess {
     private EdgeFilterAccess() {
     }
 
-    public static void sanitize(HttpHeaders headers, String correlationId) {
-        EdgeFilter.sanitize(headers, correlationId);
+    public static void sanitize(HttpHeaders headers, String correlationId, String gatewayToken) {
+        EdgeFilter.sanitize(headers, correlationId, gatewayToken);
     }
 }

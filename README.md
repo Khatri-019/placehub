@@ -135,13 +135,20 @@ services. The password for every account is `PlaceHub@123`.
 |-------|------|---------|
 | `admin@placehub.local` | ADMIN | — |
 | `recruiter@placehub.local` | RECRUITER | Northstar Technologies, Talent Acquisition Lead |
+| `recruiter2@placehub.local` | RECRUITER | Meera Recruiter, Meridian Analytics (v3) |
 | `student@placehub.local` | STUDENT | CSE, 2027, CGPA 8.60, 0 backlogs |
 | `student2@placehub.local` | STUDENT | ME, 2027, CGPA 6.40, 2 backlogs |
 
 Seeded jobs (all owned by the seeded recruiter at Northstar Technologies): **Graduate Software Engineer** (published;
 CGPA ≥ 7.5, 0 backlogs, CSE/ISE/AIML, 2027), **Data Analyst Intern** (published; CGPA ≥ 6.0, ≤ 2 backlogs, all
 branches, 2027/2028), **Embedded Systems Engineer** (published; CGPA ≥ 7.0, ECE/EEE/ETE) and **Platform Engineer**
-(draft, hidden from students). There are no seeded applications, so the demo starts clean.
+(draft, hidden from students). Meridian Analytics (owned by `recruiter2@`) has **Senior Data Engineer** (20 LPA) and
+**Quant Developer** (30 LPA). Seeded CTCs: Graduate Software Engineer 12, Embedded Systems Engineer 8, Data Analyst
+Intern none. Placement policy **v1** is active (see below). There are no seeded applications, so the demo starts clean.
+
+Each role has its own sign-in page: http://localhost:5173/login/student, `/login/recruiter`, `/login/admin`
+(`/login` lets you pick). Signing in through another role's portal is refused with 403, but only after a correct
+password, so the portal cannot be used to probe which emails exist.
 
 Public registration can never create an admin. In other environments, create one with a manual SQL insert into
 `users` on `users-db` using a BCrypt hash.
@@ -158,6 +165,29 @@ Public registration can never create an admin. In other environments, create one
    Software Engineer is now SHORTLISTED". The recruiter also received "New applicant for …".
 6. Optional: as the student, withdraw from **My applications**. The recruiter is notified.
 
+**v3 walkthrough (placement policy, consent, auto-shortlist):**
+
+1. Sign in at `/login/student` as `student@placehub.local`, open **Profile & resume** and upload a PDF (≤ 2 MB). Without
+   a resume, **Apply** is disabled and the API answers 422 `RESUME_REQUIRED`.
+2. Apply to **Graduate Software Engineer** (12 LPA). As `recruiter@` move it to **Shortlisted → Selected**. The student
+   is now placed at 12 LPA; the dashboard banner explains the bands that now apply.
+3. As the student, browse jobs: **Embedded Systems Engineer** shows *Blocked* (below 1.5×), **Senior Data Engineer**
+   (20 LPA, 1.67×) shows *Consent needed*, **Quant Developer** (30 LPA, 2.5×) is *Open*, and the internship is
+   unaffected. Apply to Senior Data Engineer: read the consent to the end, tick the box and type your name.
+4. As `recruiter2@`, switch Senior Data Engineer to **Auto-shortlist** in the job form: new qualifying applicants start
+   as *Shortlisted* by SYSTEM (an "Auto" badge marks them). **Apply to existing applicants** re-screens open ones.
+   Select several applicants to change their status in bulk.
+5. Select the student at 20 LPA: that band locks on placement, so the student is locked and their other open
+   applications are withdrawn by SYSTEM. Any new application returns 422 `STUDENT_LOCKED`.
+6. As `admin@`, open **Placement policy**: edit bands (gaps/overlaps are flagged live), preview the consent text,
+   try the simulator against the unsaved draft, then publish with a change note. Earlier applications keep their
+   policy snapshot. **Placements** unlocks the student (reason required, audited); **Consents** exports CSV.
+
+| Placement policy editor | Student job details |
+|---|---|
+| ![Policy editor](docs/screenshots/admin-policy-light.png) | ![Job details](docs/screenshots/student-job-details-light.png) |
+| ![Policy editor, dark](docs/screenshots/admin-policy-dark.png) | ![Recruiter applicants](docs/screenshots/recruiter-applicants-light.png) |
+
 **Kafka-down demo (outbox):**
 
 ```bash
@@ -169,6 +199,37 @@ docker compose start kafka
 
 **Dependency-down demo:** `docker compose stop job-service`, then try to apply. You get 503 "Eligibility could not be
 verified. Try again shortly." and nothing is created. `docker compose start job-service` restores it.
+
+## 6a. v3 features
+
+### Placement policy
+The placement office configures CTC bands as multiples of a placed student's current CTC: each band blocks, requires
+consent, or allows the application, and may lock the student when they are selected in it. The policy is versioned
+(every save is a new version with a change note and an audit entry), can exclude internships, can cap active consents,
+and decides whether a resume is required and whether a lock withdraws other open applications. Every application stores
+the policy version, decision and band it was made under. Consents store the exact rendered text, its SHA-256 hash,
+the signed name, client IP and user agent; only admins can see or export them.
+
+### Resumes
+Students upload PDFs (magic-byte checked, ≤ 2 MB); the last versions are kept and versions referenced by applications
+are never deleted. An application pins the resume version it was made with. Students download their own; recruiters
+only through applications to their own jobs; tokens never appear in URLs.
+
+### Auto-shortlisting, history and bulk actions
+A job can use manual review or auto-shortlist applicants meeting stricter CGPA/backlog criteria. Every status change is
+recorded in a history timeline (actor USER or SYSTEM). Recruiters can change many applications at once; each item
+succeeds or fails on its own.
+
+### UI
+Light and dark themes (toggle saved in the browser; defaults to the OS setting), self-hosted Inter, a component set in
+`src/ui`, and one lazily loaded chunk per role. Budgets are enforced by `npm run size` (also in the Docker build):
+initial load 109 KB gzip (≤ 120), role chunks 13–16 KB (≤ 80). Lighthouse (mobile, production build): landing 99/100/100/100,
+login 97/100/100/100, student jobs 96/100/100/100, recruiter applicants 97/100/100/100 (Performance/Accessibility/
+Best practices/SEO), CLS 0. axe reports no WCAG 2.1 AA violations on the key pages in either theme.
+
+| Landing | Student dashboard (dark) |
+|---|---|
+| ![Landing](docs/screenshots/landing-light.png) | ![Student dashboard](docs/screenshots/student-dashboard-dark.png) |
 
 ## 7. Events, outbox, delivery semantics
 
@@ -258,8 +319,10 @@ Emails are simulated by `ConsoleEmailSender`, which logs `[SIMULATED EMAIL]` lin
 
 ```bash
 cd backend && ./mvnw verify                 # unit tests + Testcontainers integration tests (*IT)
-cd frontend/placehub-web && npm ci && npm run lint && npm test && npm run build
+cd frontend/placehub-web && npm ci && npm run lint && npm test && npm run build && npm run size
+cd frontend/placehub-web && npx playwright install chromium && npm run e2e   # browser tests against the stack
 ./scripts/e2e-smoke.sh                       # against a running stack; GATEWAY_URL overrides the target
+cd scripts/lighthouse && npm install && node flow.mjs <chrome-path> report.html   # optional Lighthouse flow
 ```
 
 - **Unit tests** always run and need no Docker. They cover registration and login rules, JWT claims and expiry, every
@@ -270,8 +333,13 @@ cd frontend/placehub-web && npm ci && npm run lint && npm test && npm run build
   with WireMock standing in for Feign dependencies. They are annotated
   `@Testcontainers(disabledWithoutDocker = true)`, so **without Docker they are reported as skipped** and the build
   still passes.
-- The **smoke script** runs the 16 acceptance scenarios from spec §11.3 plus a withdraw → recruiter-notified check. It
-  creates fresh users each run, so it can be rerun. It prints PASS/FAIL per step and exits non-zero on any failure.
+- The **smoke script** runs the 16 acceptance scenarios from spec §11.3, a withdraw → recruiter-notified check and the
+  eight v3 scenarios (resume required, auto-shortlist, the full placement/consent/lock flow, unlock audit, a new policy
+  version with simulation and unchanged snapshots, consent CSV, portal 403/401). It creates fresh users each run and
+  restores the seeded policy bands and screening mode it changes, so it can be rerun.
+- **Playwright** (`frontend/placehub-web/e2e`) drives the real stack in headless Chromium: the v2 journeys, resume
+  upload, the consent modal, the policy editor and simulator, bulk shortlisting, the three portals, theme and policy
+  ribbon, a 390×844 mobile browse, and axe checks with screenshots (written to `docs/screenshots/`). It prints PASS/FAIL per step and exits non-zero on any failure.
 - The JVM tests run with `-Duser.timezone=UTC` (configured in the parent POM).
 
 ## 11. Reset

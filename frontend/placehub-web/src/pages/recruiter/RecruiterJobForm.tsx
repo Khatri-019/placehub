@@ -79,10 +79,13 @@ export function RecruiterJobForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<ParsedError | null>(null);
   const [busy, setBusy] = useState(false);
+  // CTC and employment type are fixed once a job is published (they drive the placement policy).
+  const [termsLocked, setTermsLocked] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     jobApi.get(id)
+      .then((j) => { setTermsLocked(j.status !== 'DRAFT'); return j; })
       .then((j) => setForm({
         title: j.title, description: j.description, location: j.location, employmentType: j.employmentType,
         ctc: j.ctc ?? '', ctcLpa: j.ctcLpa == null ? '' : String(j.ctcLpa), minCgpa: String(j.minCgpa), maxBacklogs: String(j.maxBacklogs),
@@ -169,14 +172,14 @@ export function RecruiterJobForm() {
           </Field>
           <Field id="employmentType" label="Employment type">
             {(a) => (
-              <select {...a} value={form.employmentType} onChange={(e) => setForm({ ...form, employmentType: e.target.value as EmploymentType })}>
+              <select {...a} disabled={termsLocked} value={form.employmentType} onChange={(e) => setForm({ ...form, employmentType: e.target.value as EmploymentType })}>
                 {Object.entries(EMPLOYMENT_TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             )}
           </Field>
           <Field id="ctcLpa" label="CTC (LPA)" error={errors.ctcLpa}
-            hint={form.employmentType === 'FULL_TIME' ? 'Lakhs per annum; required to publish' : 'Optional for internships'}>
-            {(a) => <input {...a} type="number" step="0.01" min={0.01} value={form.ctcLpa} onChange={(e) => setForm({ ...form, ctcLpa: e.target.value })} />}
+            hint={termsLocked ? 'Fixed after publishing' : form.employmentType === 'FULL_TIME' ? 'Lakhs per annum; required to publish' : 'Optional for internships'}>
+            {(a) => <input {...a} disabled={termsLocked} type="number" step="0.01" min={0.01} value={form.ctcLpa} onChange={(e) => setForm({ ...form, ctcLpa: e.target.value })} />}
           </Field>
           <Field id="ctc" label="CTC label (optional)" error={errors.ctc}>
             {(a) => <input {...a} maxLength={100} value={form.ctc} onChange={(e) => setForm({ ...form, ctc: e.target.value })} />}

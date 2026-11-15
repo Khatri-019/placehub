@@ -85,14 +85,21 @@ Phase 9 (v3, BUILD_SPEC §20):
       app verify 143 unit + 9 IT; smoke 35/35
       Palette (tokens.css only; no hex elsewhere): light text #1c1b2e/bg #f7f6fa 15.67:1, muted #5b5a72/white 6.67:1;
       dark text #ecebf5/bg #14132a 15.37:1, muted #b6b4cf/#201e3e 7.91:1; white on primary #c2560f 4.53:1
-- [ ] 9.7 Security review (fresh subagent) + test-first fixes
+- [x] 9.7 Security review — fresh subagent: 0 critical/high, 2 medium, 6 low, info (IMPLEMENTATION_NOTES table).
+      Fixed test-first: F1 gateway account-status filter (deactivated → 401 ≤ 15 s; live), F2 debug ports on
+      127.0.0.1 + example-secret WARN, F3 gateway-attested XFF, F5 login throttle 10/15 min/email (live 429), F6, F7
+      CTC/type fixed after publish, F8 advisory-lock consent recount, F9 /api/admin/** URL rule. Accepted: F4 (smoke
+      requires 403), dup-email 409, CSP/RS256 as hardening. Proof: gateway 13, user 29+10 IT, job 25+3 IT, app 147+9
+      IT; smoke 64/64 (35 v2 + 29 v3); Playwright 24/24
 - [ ] 9.8 Tests, smoke, Playwright, screenshots, docs, clean final verification
 
 Definition of Done (v2 §17): all [x] (see git history of this file). Frontend click-through gap closes with Playwright.
 
 ## 5. Current state
-- 9.6 done and committed. Next: 9.7 security review (fresh subagent, repo + permission matrix only). Stack running
-  with current images. Lighthouse: `cd scripts/lighthouse && npm install && node flow.mjs <chrome> report.html`.
+- 9.7 done and committed. Next: 9.8 docs polish + clean final verification (down -v, up --build, smoke, frontend
+  ci/lint/test/build/size/e2e, ./mvnw clean verify, Lighthouse, docker stats) and the final report. Smoke v3 + e2e
+  v3/a11y specs and README v3 sections already written. Lighthouse: `cd scripts/lighthouse && npm install && node
+  flow.mjs <chrome> report.html`.
 
 ## 6. Known issues / deviations from spec
 - Java 25 instead of 21 (user edit). VS Code redhat.java may race on `target/` → rerun `./mvnw clean verify`.

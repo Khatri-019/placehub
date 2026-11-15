@@ -132,6 +132,25 @@ class JobServiceTest {
     }
 
     @Test
+    void publishedJobsKeepTheirCtcAndEmploymentType() {
+        // Security review F7: changing these after publishing would sidestep the placement policy (e.g. a full-time
+        // offer relabelled as an internship). Other fields stay editable; an equal CTC with another scale is fine.
+        job.setStatus(JobStatus.PUBLISHED);
+        JobRequest lowerCtc = new JobRequest("SE", "desc", "Pune", EmploymentType.FULL_TIME, null, new BigDecimal("10.00"),
+                new BigDecimal("7.00"), 0, Set.of(Branch.CSE), Set.of(), NOW.plusSeconds(600));
+        assertThatThrownBy(() -> service.update(owner, job.getId(), lowerCtc))
+                .satisfies(e -> assertThat(status(e)).isEqualTo(HttpStatus.CONFLICT))
+                .hasMessageContaining("CTC and employment type");
+        JobRequest asInternship = new JobRequest("SE", "desc", "Pune", EmploymentType.INTERNSHIP, null,
+                new BigDecimal("12.00"), new BigDecimal("7.00"), 0, Set.of(Branch.CSE), Set.of(), NOW.plusSeconds(600));
+        assertThatThrownBy(() -> service.update(owner, job.getId(), asInternship))
+                .satisfies(e -> assertThat(status(e)).isEqualTo(HttpStatus.CONFLICT));
+        JobRequest sameTerms = new JobRequest("SE (Backend)", "new desc", "Pune", EmploymentType.FULL_TIME, null,
+                new BigDecimal("12"), new BigDecimal("7.00"), 0, Set.of(Branch.CSE), Set.of(), NOW.plusSeconds(600));
+        assertThat(service.update(owner, job.getId(), sameTerms).title()).isEqualTo("SE (Backend)");
+    }
+
+    @Test
     void publishedFullTimeJobCannotDropItsCtc() {
         job.setStatus(JobStatus.PUBLISHED);
         JobRequest noCtc = new JobRequest("SE II", "desc", "Pune", EmploymentType.FULL_TIME, "10 LPA", null, null,

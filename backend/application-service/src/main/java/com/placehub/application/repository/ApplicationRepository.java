@@ -22,6 +22,13 @@ public interface ApplicationRepository extends JpaRepository<Application, UUID>,
             + " com.placehub.application.domain.ApplicationStatus.SHORTLISTED)")
     long countActiveConsentApplications(@Param("id") UUID studentId);
 
+    /**
+     * Transaction-scoped advisory lock per student, held until commit: serialises consent applies so the
+     * maxActiveConsents re-check cannot be raced (security review F8). Returns 1.
+     */
+    @Query(value = "select count(*) from (select pg_advisory_xact_lock(hashtext(:id))) l", nativeQuery = true)
+    long lockStudentForConsent(@Param("id") String studentId);
+
     /** Rows of [status, count]. */
     @Query("select a.status, count(a) from Application a where a.studentUserId = :id group by a.status")
     List<Object[]> countByStatusForStudent(@Param("id") UUID studentId);

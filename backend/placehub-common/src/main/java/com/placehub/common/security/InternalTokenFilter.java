@@ -27,6 +27,10 @@ public class InternalTokenFilter extends OncePerRequestFilter {
         this.expected = expectedToken == null || expectedToken.isBlank()
                 ? null : expectedToken.getBytes(StandardCharsets.UTF_8);
         this.handlers = handlers;
+        if (JwtKeys.isLocalExampleValue(expectedToken)) {
+            org.slf4j.LoggerFactory.getLogger(InternalTokenFilter.class).warn(
+                    "INTERNAL_SERVICE_TOKEN is the local example value from .env.example; replace it outside a local demo");
+        }
     }
 
     @Override

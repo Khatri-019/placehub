@@ -42,9 +42,19 @@ public class AuthService {
     private final RecruiterProperties props;
     /** Hash used to keep login timing similar for unknown emails. */
     private final String dummyHash;
+    private final LoginThrottle throttle;
 
     public AuthService(UserRepository users, StudentDetailsRepository students, RecruiterDetailsRepository recruiters,
                        PasswordEncoder passwordEncoder, TokenService tokenService, RecruiterProperties props) {
+        this(users, students, recruiters, passwordEncoder, tokenService, props,
+                new LoginThrottle(java.time.Clock.systemUTC(), LoginThrottle.DEFAULT_MAX_FAILURES, LoginThrottle.DEFAULT_WINDOW));
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AuthService(UserRepository users, StudentDetailsRepository students, RecruiterDetailsRepository recruiters,
+                       PasswordEncoder passwordEncoder, TokenService tokenService, RecruiterProperties props,
+                       LoginThrottle throttle) {
+        this.throttle = throttle;
         this.users = users;
         this.students = students;
         this.recruiters = recruiters;
@@ -86,14 +96,19 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public LoginResponse login(LoginRequest req) {
-        User user = users.findByEmail(normalizeEmail(req.email())).orElse(null);
+        String email = normalizeEmail(req.email());
+        throttle.checkAllowed(email);
+        User user = users.findByEmail(email).orElse(null);
         if (user == null) {
             passwordEncoder.matches(req.password(), dummyHash);
+            throttle.recordFailure(email);
             throw ApiException.unauthorized(BAD_CREDENTIALS);
         }
         if (!passwordEncoder.matches(req.password(), user.getPasswordHash())) {
+            throttle.recordFailure(email);
             throw ApiException.unauthorized(BAD_CREDENTIALS);
         }
+        throttle.recordSuccess(email);
         // Only reached with valid credentials, so the role is never revealed to someone without the password.
         if (req.portal() != null && req.portal() != user.getRole()) {
             throw ApiException.forbidden(portalMismatch(req.portal(), user.getRole()));

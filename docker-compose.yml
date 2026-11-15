@@ -32,7 +32,7 @@ services:
       POSTGRES_DB: placehub_users
       POSTGRES_USER: ${USERS_DB_USER:?set USERS_DB_USER in .env}
       POSTGRES_PASSWORD: ${USERS_DB_PASSWORD:?set USERS_DB_PASSWORD in .env}
-    ports: ["5433:5432"]
+    ports: ["127.0.0.1:5433:5432"]
     volumes: [users-db-data:/var/lib/postgresql/data]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
@@ -48,7 +48,7 @@ services:
       POSTGRES_DB: placehub_applications
       POSTGRES_USER: ${APPLICATIONS_DB_USER:?set APPLICATIONS_DB_USER in .env}
       POSTGRES_PASSWORD: ${APPLICATIONS_DB_PASSWORD:?set APPLICATIONS_DB_PASSWORD in .env}
-    ports: ["5434:5432"]
+    ports: ["127.0.0.1:5434:5432"]
     volumes: [applications-db-data:/var/lib/postgresql/data]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
@@ -65,7 +65,7 @@ services:
       MYSQL_USER: ${JOBS_DB_USER:?set JOBS_DB_USER in .env}
       MYSQL_PASSWORD: ${JOBS_DB_PASSWORD:?set JOBS_DB_PASSWORD in .env}
       MYSQL_ROOT_PASSWORD: ${JOBS_DB_ROOT_PASSWORD:?set JOBS_DB_ROOT_PASSWORD in .env}
-    ports: ["3307:3306"]
+    ports: ["127.0.0.1:3307:3306"]
     volumes: [jobs-db-data:/var/lib/mysql]
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$${MYSQL_ROOT_PASSWORD} --silent"]
@@ -82,7 +82,7 @@ services:
       MONGO_INITDB_ROOT_USERNAME: ${NOTIFICATIONS_MONGO_USER:?set NOTIFICATIONS_MONGO_USER in .env}
       MONGO_INITDB_ROOT_PASSWORD: ${NOTIFICATIONS_MONGO_PASSWORD:?set NOTIFICATIONS_MONGO_PASSWORD in .env}
       MONGO_INITDB_DATABASE: placehub_notifications
-    ports: ["27018:27017"]
+    ports: ["127.0.0.1:27018:27017"]
     volumes: [notifications-db-data:/data/db]
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
@@ -111,7 +111,7 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_NUM_PARTITIONS: 3
       KAFKA_LOG_DIRS: /var/lib/kafka/data
-    ports: ["29092:29092"]
+    ports: ["127.0.0.1:29092:29092"]
     volumes: [kafka-data:/var/lib/kafka/data]
     healthcheck:
       # Small heap for the CLI JVM so it fits next to the broker inside the 768m limit.
@@ -131,7 +131,7 @@ services:
     environment:
       <<: *jvm-env
       EUREKA_HOSTNAME: discovery-server
-    ports: ["8761:8761"]
+    ports: ["127.0.0.1:8761:8761"]
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8761/actuator/health/liveness || exit 1"]
       <<: *hc-timing
@@ -146,6 +146,7 @@ services:
       <<: *jvm-env
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5173}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?set INTERNAL_SERVICE_TOKEN in .env}
     ports: ["8080:8080"]
     depends_on:
       discovery-server: { condition: service_healthy }
@@ -168,7 +169,7 @@ services:
       USERS_DB_URL: ${USERS_DB_URL:?set USERS_DB_URL in .env}
       USERS_DB_USER: ${USERS_DB_USER}
       USERS_DB_PASSWORD: ${USERS_DB_PASSWORD}
-    ports: ["8081:8081"]
+    ports: ["127.0.0.1:8081:8081"]
     depends_on:
       users-db: { condition: service_healthy }
       discovery-server: { condition: service_healthy }
@@ -189,7 +190,7 @@ services:
       JOBS_DB_URL: ${JOBS_DB_URL:?set JOBS_DB_URL in .env}
       JOBS_DB_USER: ${JOBS_DB_USER}
       JOBS_DB_PASSWORD: ${JOBS_DB_PASSWORD}
-    ports: ["8082:8082"]
+    ports: ["127.0.0.1:8082:8082"]
     depends_on:
       jobs-db: { condition: service_healthy }
       discovery-server: { condition: service_healthy }
@@ -211,7 +212,7 @@ services:
       APPLICATIONS_DB_USER: ${APPLICATIONS_DB_USER}
       APPLICATIONS_DB_PASSWORD: ${APPLICATIONS_DB_PASSWORD}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
-    ports: ["8083:8083"]
+    ports: ["127.0.0.1:8083:8083"]
     depends_on:
       applications-db: { condition: service_healthy }
       kafka: { condition: service_healthy }
@@ -231,7 +232,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       NOTIFICATIONS_MONGO_URI: ${NOTIFICATIONS_MONGO_URI:?set NOTIFICATIONS_MONGO_URI in .env}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
-    ports: ["8084:8084"]
+    ports: ["127.0.0.1:8084:8084"]
     depends_on:
       notifications-db: { condition: service_healthy }
       kafka: { condition: service_healthy }
@@ -264,7 +265,7 @@ services:
     mem_limit: 256m
     volumes:
       - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    ports: ["9090:9090"]
+    ports: ["127.0.0.1:9090:9090"]
 
   grafana:
     image: grafana/grafana:12.1.0
@@ -278,7 +279,7 @@ services:
     volumes:
       - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./infrastructure/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    ports: ["3000:3000"]
+    ports: ["127.0.0.1:3000:3000"]
     depends_on: [prometheus]
 
 volumes:

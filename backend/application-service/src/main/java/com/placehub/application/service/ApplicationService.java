@@ -115,7 +115,8 @@ public class ApplicationService {
         }
         boolean auto = AutoShortlist.qualifies(job, profile.cgpa(), profile.backlogCount());
         try {
-            return ApplicationMapper.toResponse(writer.create(application, consentRecord, auto), false);
+            return ApplicationMapper.toResponse(writer.create(application, consentRecord, auto,
+                    consentRecord == null ? null : a.rules().maxActiveConsents()), false);
         } catch (DataIntegrityViolationException e) {
             throw ApiException.conflict(ALREADY_APPLIED);
         }

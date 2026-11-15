@@ -20,6 +20,8 @@ placehub:
     jwt-secret: ${JWT_SECRET:}
     jwt-issuer: placehub-user-service
     frontend-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
+    internal-token: ${INTERNAL_SERVICE_TOKEN:}
+    account-status-ttl-seconds: 15
 
 eureka:
   client:

@@ -114,7 +114,7 @@ class ApplicationServiceTest {
         when(deps.jobSummary(jobId)).thenReturn(new ClientDtos.JobSummary(jobId, "Graduate SE", UUID.randomUUID(),
                 "Northstar", recruiterId, "PUBLISHED", Instant.now().plusSeconds(3600), new BigDecimal("12.00"),
                 "FULL_TIME"));
-        when(writer.create(any(), any(), org.mockito.ArgumentMatchers.anyBoolean())).thenAnswer(inv -> inv.getArgument(0));
+        when(writer.create(any(), any(), org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0));
         when(writer.changeStatus(any(), any(), any(), any())).thenAnswer(inv -> {
             Application a = inv.getArgument(0);
             a.changeStatus(inv.getArgument(1), inv.getArgument(2));
@@ -132,14 +132,19 @@ class ApplicationServiceTest {
                 new ClientDtos.EligibilityResult(jobId, true, List.of()));
         var res = service.apply(student, jobId);
         assertThat(res.status()).isEqualTo(ApplicationStatus.APPLIED);
-        assertThat(res.recruiterOwnerUserId()).isEqualTo(recruiterId);
+        // The owner snapshot comes from Job Service (trusted) and is stored; the student's view omits it (F6).
+        org.mockito.ArgumentCaptor<com.placehub.application.entity.Application> saved =
+                org.mockito.ArgumentCaptor.forClass(com.placehub.application.entity.Application.class);
+        verify(writer).create(saved.capture(), any(), org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.any());
+        assertThat(saved.getValue().getRecruiterOwnerUserId()).isEqualTo(recruiterId);
+        assertThat(res.recruiterOwnerUserId()).isNull();
         assertThat(res.jobTitle()).isEqualTo("Graduate SE");
         assertThat(res.companyName()).isEqualTo("Northstar");
         assertThat(res.cgpa()).isEqualByComparingTo("8.60");
         assertThat(res.studentUserId()).isEqualTo(student.id());
         assertThat(res.ctcLpa()).isEqualByComparingTo("12.00");
         assertThat(res.employmentType()).isEqualTo("FULL_TIME");
-        verify(writer).create(any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
+        verify(writer).create(any(), any(), org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -167,7 +172,7 @@ class ApplicationServiceTest {
         assertThat(res.hasResume()).isTrue();
         verify(deps).referenceResume(student.id(), resumeId);
         org.mockito.ArgumentCaptor<Application> saved = org.mockito.ArgumentCaptor.forClass(Application.class);
-        verify(writer).create(saved.capture(), any(), org.mockito.ArgumentMatchers.anyBoolean());
+        verify(writer).create(saved.capture(), any(), org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.any());
         assertThat(saved.getValue().getResumeIdSnapshot()).isEqualTo(resumeId);
     }
 
@@ -259,7 +264,7 @@ class ApplicationServiceTest {
         org.mockito.ArgumentCaptor<Application> app = org.mockito.ArgumentCaptor.forClass(Application.class);
         org.mockito.ArgumentCaptor<ApplicationWriter.ConsentFactory> factory =
                 org.mockito.ArgumentCaptor.forClass(ApplicationWriter.ConsentFactory.class);
-        verify(writer).create(app.capture(), factory.capture(), org.mockito.ArgumentMatchers.eq(false));
+        verify(writer).create(app.capture(), factory.capture(), org.mockito.ArgumentMatchers.eq(false), org.mockito.ArgumentMatchers.any());
         assertThat(app.getValue().getPolicyDecisionSnapshot()).isEqualTo("REQUIRE_CONSENT");
         assertThat(app.getValue().getRatioSnapshot()).isEqualByComparingTo("1.67");
         assertThat(app.getValue().isLockOnPlacementSnapshot()).isTrue();
@@ -294,7 +299,7 @@ class ApplicationServiceTest {
         assertThat(service.apply(student, jobId).status()).isEqualTo(ApplicationStatus.APPLIED);
         jobPays(null, "INTERNSHIP");
         assertThat(service.apply(student, jobId).status()).isEqualTo(ApplicationStatus.APPLIED);
-        verify(writer, org.mockito.Mockito.times(2)).create(any(), org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.eq(false));
+        verify(writer, org.mockito.Mockito.times(2)).create(any(), org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.eq(false), org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -355,10 +360,10 @@ class ApplicationServiceTest {
     void qualifyingApplicantsOnAutoJobsAreCreatedAsAutoShortlist() {
         autoJob("8.00", 0);
         service.apply(student, jobId);
-        verify(writer).create(any(), any(), org.mockito.ArgumentMatchers.eq(true));
+        verify(writer).create(any(), any(), org.mockito.ArgumentMatchers.eq(true), org.mockito.ArgumentMatchers.any());
         autoJob("9.00", 0); // the student's 8.60 misses the cutoff: stays APPLIED for manual review
         service.apply(student, jobId);
-        verify(writer).create(any(), any(), org.mockito.ArgumentMatchers.eq(false));
+        verify(writer).create(any(), any(), org.mockito.ArgumentMatchers.eq(false), org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -415,7 +420,7 @@ class ApplicationServiceTest {
     void duplicateIsMappedFromTheUniqueConstraintTo409() {
         when(deps.validateEligibility(eq(jobId), any())).thenReturn(
                 new ClientDtos.EligibilityResult(jobId, true, List.of()));
-        when(writer.create(any(), any(), org.mockito.ArgumentMatchers.anyBoolean())).thenThrow(new DataIntegrityViolationException("uq_app_job_student"));
+        when(writer.create(any(), any(), org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.any())).thenThrow(new DataIntegrityViolationException("uq_app_job_student"));
         assertThatThrownBy(() -> service.apply(student, jobId))
                 .hasMessage(ApplicationService.ALREADY_APPLIED)
                 .satisfies(e -> assertThat(status(e)).isEqualTo(HttpStatus.CONFLICT));
@@ -513,6 +518,9 @@ class ApplicationServiceTest {
         assertThatThrownBy(() -> service.get(otherRecruiter, a.getId()))
                 .satisfies(e -> assertThat(status(e)).isEqualTo(HttpStatus.NOT_FOUND));
         assertThat(service.get(student, a.getId()).id()).isEqualTo(a.getId());
+        // Security review F6: students do not get other users' ids; the owning recruiter and admins do.
+        assertThat(service.get(student, a.getId()).recruiterOwnerUserId()).isNull();
+        assertThat(service.get(recruiter, a.getId()).recruiterOwnerUserId()).isEqualTo(recruiterId);
         assertThat(service.get(recruiter, a.getId()).id()).isEqualTo(a.getId());
         assertThat(service.get(admin, a.getId()).id()).isEqualTo(a.getId());
     }

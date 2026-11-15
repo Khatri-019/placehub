@@ -26,12 +26,16 @@ public class EdgeFilter implements WebFilter {
 
     public static final String CORRELATION_HEADER = "X-Correlation-Id";
     public static final String INTERNAL_TOKEN_HEADER = "X-Internal-Token";
+    /** Attests to the services that a request came through the gateway (security review F3). */
+    public static final String GATEWAY_TOKEN_HEADER = "X-Gateway-Token";
     private static final Pattern SAFE = Pattern.compile("[A-Za-z0-9._-]{1,64}");
 
     private final ErrorWriter errorWriter;
+    private final String gatewayToken;
 
-    public EdgeFilter(ErrorWriter errorWriter) {
+    public EdgeFilter(ErrorWriter errorWriter, com.placehub.gateway.config.GatewayProperties props) {
         this.errorWriter = errorWriter;
+        this.gatewayToken = props.internalToken();
     }
 
     @Override
@@ -48,16 +52,20 @@ public class EdgeFilter implements WebFilter {
         }
 
         ServerHttpRequest mutated = exchange.getRequest().mutate()
-                .headers(h -> sanitize(h, correlationId))
+                .headers(h -> sanitize(h, correlationId, gatewayToken))
                 .build();
         return chain.filter(exchange.mutate().request(mutated).build());
     }
 
-    static void sanitize(HttpHeaders headers, String correlationId) {
+    static void sanitize(HttpHeaders headers, String correlationId, String gatewayToken) {
         List<String> spoofable = headers.headerNames().stream()
-                .filter(n -> n.regionMatches(true, 0, "X-User-", 0, 7) || n.equalsIgnoreCase(INTERNAL_TOKEN_HEADER))
+                .filter(n -> n.regionMatches(true, 0, "X-User-", 0, 7) || n.equalsIgnoreCase(INTERNAL_TOKEN_HEADER)
+                        || n.equalsIgnoreCase(GATEWAY_TOKEN_HEADER))
                 .toList();
         spoofable.forEach(headers::remove);
         headers.set(CORRELATION_HEADER, correlationId);
+        if (gatewayToken != null && !gatewayToken.isBlank()) {
+            headers.set(GATEWAY_TOKEN_HEADER, gatewayToken);
+        }
     }
 }

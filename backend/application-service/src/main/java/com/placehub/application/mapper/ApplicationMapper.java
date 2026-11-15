@@ -9,11 +9,13 @@ public final class ApplicationMapper {
     }
 
     /**
-     * @param includeRecruiterNote the recruiter's note is internal feedback, shown to the owning recruiter and admins
-     *                             only (spec is silent; documented in IMPLEMENTATION_NOTES.md)
+     * @param includeRecruiterNote staff view (owning recruiter or admin). The recruiter's note is internal feedback
+     *                             (spec is silent; IMPLEMENTATION_NOTES.md), and students do not get the recruiter's
+     *                             user id either (security review F6)
      */
     public static ApplicationResponse toResponse(Application a, boolean includeRecruiterNote) {
-        return new ApplicationResponse(a.getId(), a.getJobId(), a.getStudentUserId(), a.getRecruiterOwnerUserId(),
+        return new ApplicationResponse(a.getId(), a.getJobId(), a.getStudentUserId(),
+                includeRecruiterNote ? a.getRecruiterOwnerUserId() : null,
                 a.getJobTitleSnapshot(), a.getCompanyNameSnapshot(), a.getStudentNameSnapshot(),
                 a.getStudentEmailSnapshot(), a.getBranchSnapshot(), a.getCgpaSnapshot(),
                 a.getGraduationYearSnapshot(), a.getBacklogCountSnapshot(), a.getStatus(),

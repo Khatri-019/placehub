@@ -2,6 +2,7 @@ package com.placehub.user.config;
 
 import com.placehub.common.security.JwtKeys;
 import com.placehub.common.security.PlaceHubSecurityProperties;
+import com.placehub.user.service.LoginThrottle;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -27,5 +28,11 @@ public class UserSecurityBeans {
     @Bean
     public Clock clock() {
         return Clock.systemUTC();
+    }
+
+    /** Per-email failed sign-in limit (security review F5). */
+    @Bean
+    public LoginThrottle loginThrottle(Clock clock) {
+        return new LoginThrottle(clock, LoginThrottle.DEFAULT_MAX_FAILURES, LoginThrottle.DEFAULT_WINDOW);
     }
 }

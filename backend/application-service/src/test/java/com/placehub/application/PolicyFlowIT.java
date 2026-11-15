@@ -143,6 +143,8 @@ class PolicyFlowIT {
         return mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/applications")
                 .header("Authorization", token(studentId, "STUDENT"))
                 .header("X-Forwarded-For", "203.0.113.9, 10.0.0.5").header("User-Agent", "PolicyFlowIT")
+                // As added by the gateway (security review F3); without it X-Forwarded-For is ignored.
+                .header("X-Gateway-Token", "it-internal-token")
                 .contentType(MediaType.APPLICATION_JSON).content(body));
     }
 
@@ -229,6 +231,15 @@ class PolicyFlowIT {
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/admin/students/" + studentId + "/lock")
                         .header("Authorization", token(studentId, "STUDENT")).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reason\":\"x\"}"))
+                .andExpect(status().isForbidden());
+        // Security review F9: the role is checked before body validation, so invalid bodies do not reveal schemas.
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/admin/policy")
+                        .header("Authorization", token(studentId, "STUDENT")).contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/admin/placements/off-campus")
+                        .header("Authorization", token(recruiterId, "RECRUITER")).contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
                 .andExpect(status().isForbidden());
         String csv = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/admin/consents/export.csv")
                         .param("studentUserId", studentId.toString()).header("Authorization", token(adminId, "ADMIN")))

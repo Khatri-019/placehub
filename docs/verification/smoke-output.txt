@@ -1,0 +1,119 @@
+PlaceHub Lite smoke test against http://localhost:8080 (run 1794749109-11411)
+Waiting up to 240s for the gateway and a successful admin login...
+Stack is ready.
+
+[1] Student registers and logs in
+  [32mPASS[0m student registration (HTTP 201)
+  [32mPASS[0m student login returns a token
+  [32mPASS[0m student uploads a PDF resume (v3: resumes are required to apply by default) (HTTP 201)
+
+[2] Recruiter registers and logs in
+  [32mPASS[0m recruiter registration (HTTP 201)
+  [32mPASS[0m recruiter login returns a token
+
+[3] Recruiter creates a company and creates + publishes a job (min CGPA 7.0, CSE/ISE)
+  [32mPASS[0m create company (HTTP 201)
+  [32mPASS[0m create job (draft) (HTTP 201)
+  [32mPASS[0m publish job (HTTP 200)
+  [32mPASS[0m job status is PUBLISHED
+
+[4] Student browses jobs and sees the job
+  [32mPASS[0m published job visible in browse results
+
+[5] Eligible student applies
+  [32mPASS[0m apply (HTTP 201)
+
+[6] Same student applies again
+  [32mPASS[0m duplicate application rejected (HTTP 409)
+
+[7] Ineligible student (CGPA 6.0) applies
+  [32mPASS[0m second student registration (HTTP 201)
+  [32mPASS[0m ineligible application rejected (HTTP 422)
+  [32mPASS[0m 422 carries reasons: Minimum CGPA required is 7.00; yours is 6.00; Upload your resume before applying
+
+[8] Student gets an APPLICATION_CREATED notification within 15s
+  [32mPASS[0m APPLICATION_CREATED notification arrived after ~0s
+
+[9] Recruiter lists applicants for the job
+  [32mPASS[0m applicant list contains the student
+
+[10] Recruiter shortlists the application
+  [32mPASS[0m shortlist (HTTP 200)
+
+[11] Application status is SHORTLISTED
+  [32mPASS[0m student sees SHORTLISTED
+
+[12] Student gets a status-change notification within 15s
+  [32mPASS[0m APPLICATION_STATUS_CHANGED notification arrived after ~1s
+
+[13] Second student cannot see the first student's application or notifications
+  [32mPASS[0m other student's application is hidden (HTTP 404)
+  [32mPASS[0m second student's notifications contain none of the first student's
+
+[14] A second recruiter cannot edit the job or update the application
+  [32mPASS[0m second recruiter registration (HTTP 201)
+  [32mPASS[0m foreign job edit forbidden (HTTP 403)
+  [32mPASS[0m foreign application update forbidden (HTTP 403)
+
+[15] Seeded admin can use admin endpoints; a student cannot
+  [32mPASS[0m admin GET /api/admin/users (HTTP 200)
+  [32mPASS[0m student GET /api/admin/users (HTTP 403)
+  [32mPASS[0m admin GET /api/admin/jobs (HTTP 200)
+  [32mPASS[0m student GET /api/admin/jobs (HTTP 403)
+  [32mPASS[0m admin GET /api/admin/applications (HTTP 200)
+  [32mPASS[0m student GET /api/admin/applications (HTTP 403)
+
+[16] Internal endpoints are not reachable through the gateway
+  [32mPASS[0m GET /internal/users/<id> via gateway (HTTP 404)
+
+[extra] Student withdraws; recruiter is notified (Definition of Done)
+  [32mPASS[0m withdraw (HTTP 200)
+  [32mPASS[0m second withdraw rejected (terminal status) (HTTP 409)
+  [32mPASS[0m recruiter received APPLICATION_WITHDRAWN after ~0s
+
+[v3.1] Applying without a resume is rejected with RESUME_REQUIRED
+  [32mPASS[0m apply to GSE without a resume (422 RESUME_REQUIRED)
+
+[v3.2] recruiter2 switches Senior Data Engineer to AUTO_SHORTLIST; a fresh qualifying student is shortlisted by SYSTEM
+  [32mPASS[0m screening mode saved (HTTP 200)
+  [32mPASS[0m unplaced student applies and is SHORTLISTED immediately
+  [32mPASS[0m history shows SHORTLISTED by SYSTEM
+
+[v3.3] Placement flow under policy v1 (block < 1.5x, consent 1.5-2x with lock, allow >= 2x)
+  [32mPASS[0m active policy v3 has the seeded bands
+  [32mPASS[0m apply to GSE (12 LPA) (HTTP 201)
+  [32mPASS[0m recruiter selects the student for GSE (HTTP 200)
+  [32mPASS[0m student is placed at 12 LPA and not locked
+  [32mPASS[0m Embedded 10 LPA (0.83x) (422 POLICY_BLOCKED)
+  [32mPASS[0m Senior Data Engineer 20 LPA (1.67x) without consent (422 CONSENT_REQUIRED)
+  [32mPASS[0m Senior Data Engineer with consent (HTTP 201)
+  [32mPASS[0m Quant Developer 30 LPA (2.5x) allowed (HTTP 201)
+  [32mPASS[0m Data Analyst Intern unaffected (policy does not apply to internships) (HTTP 201)
+  [32mPASS[0m recruiter2 selects the student at 20 LPA (lock band) (HTTP 200)
+  [32mPASS[0m student is locked
+  [32mPASS[0m Quant application auto-withdrawn by SYSTEM
+  [32mPASS[0m a locked student cannot apply (422 STUDENT_LOCKED)
+
+[v3.4] Admin unlocks the student; the action is audited
+  [32mPASS[0m unlock (HTTP 200)
+  [32mPASS[0m student is unlocked
+  [32mPASS[0m audit log has STUDENT_UNLOCKED with the reason
+
+[v3.5] New policy version (consent 1.5-2.5x); simulate; earlier snapshots unchanged; then restore
+  [32mPASS[0m policy v4 is active
+  [32mPASS[0m simulate 12 -> 28 LPA (2.33x) = REQUIRE_CONSENT
+  [32mPASS[0m earlier application keeps its policy snapshot
+  [32mPASS[0m consent still records policy v3
+  [32mPASS[0m restore the original bands as a new version (HTTP 200)
+
+[v3.6] Consent CSV export contains the consent row
+  [32mPASS[0m CSV row for the consent present
+
+[v3.7] Login portals reject other roles only after a correct password
+  [32mPASS[0m student via the recruiter portal (HTTP 403)
+  [32mPASS[0m wrong password via the recruiter portal stays a generic 401 (HTTP 401)
+
+[v3.8] Restore Senior Data Engineer to MANUAL screening (keeps the demo data as seeded)
+  [32mPASS[0m screening mode back to MANUAL (HTTP 200)
+
+Smoke test finished: 64 passed, 0 failed.

@@ -132,6 +132,23 @@ class AuthServiceTest {
     }
 
     @Test
+    void repeatedFailuresAreThrottledEvenWithTheRightPasswordAndForUnknownEmails() {
+        // Security review F5. Throttling unknown emails too keeps it from revealing which emails exist.
+        existing(AccountStatus.ACTIVE);
+        when(users.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
+        for (int i = 0; i < LoginThrottle.DEFAULT_MAX_FAILURES; i++) {
+            assertThatThrownBy(() -> service.login(new LoginRequest("asha@example.com", "Wrong1234")))
+                    .satisfies(e -> assertThat(((ApiException) e).getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED));
+            assertThatThrownBy(() -> service.login(new LoginRequest("nobody@example.com", "Wrong1234")))
+                    .satisfies(e -> assertThat(((ApiException) e).getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED));
+        }
+        assertThatThrownBy(() -> service.login(new LoginRequest("ASHA@example.com", "Secret123")))
+                .satisfies(e -> assertThat(((ApiException) e).getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
+        assertThatThrownBy(() -> service.login(new LoginRequest("nobody@example.com", "Secret123")))
+                .satisfies(e -> assertThat(((ApiException) e).getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
+    }
+
+    @Test
     void wrongPasswordAndUnknownEmailShareTheSame401() {
         existing(AccountStatus.ACTIVE);
         assertThatThrownBy(() -> service.login(new LoginRequest("asha@example.com", "Wrong1234")))

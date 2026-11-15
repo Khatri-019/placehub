@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { CalendarClock, MapPin, SlidersHorizontal, Wallet } from 'lucide-react';
 import { applicationApi, jobApi, type JobBrowseFilters } from '../../api/endpoints';
@@ -33,33 +33,36 @@ function Filters({ draft, setDraft, onApply, sort, onSort }: {
   sort: string | undefined;
   onSort: (s: string) => void;
 }) {
+  // The rail and the mobile sheet both render this form, so ids must be unique per instance.
+  const uid = useId();
+  const id = (name: string) => `${uid}-${name}`;
   return (
     <form className="stack" onSubmit={onApply} role="search" aria-label="Filter jobs">
       <div className="field">
-        <label htmlFor="q">Search</label>
-        <input id="q" value={draft.q} placeholder="Title, description or company" onChange={(e) => setDraft({ ...draft, q: e.target.value })} />
+        <label htmlFor={id('q')}>Search</label>
+        <input id={id('q')} value={draft.q} placeholder="Title, description or company" onChange={(e) => setDraft({ ...draft, q: e.target.value })} />
       </div>
       <div className="field">
-        <label htmlFor="location">Location</label>
-        <input id="location" value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} />
+        <label htmlFor={id('location')}>Location</label>
+        <input id={id('location')} value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} />
       </div>
       <div className="field">
-        <label htmlFor="type">Type</label>
-        <select id="type" value={draft.employmentType} onChange={(e) => setDraft({ ...draft, employmentType: e.target.value as EmploymentType | '' })}>
+        <label htmlFor={id('type')}>Type</label>
+        <select id={id('type')} value={draft.employmentType} onChange={(e) => setDraft({ ...draft, employmentType: e.target.value as EmploymentType | '' })}>
           <option value="">Any</option>
           {Object.entries(EMPLOYMENT_TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
       </div>
       <div className="field">
-        <label htmlFor="branch">Branch</label>
-        <select id="branch" value={draft.branch} onChange={(e) => setDraft({ ...draft, branch: e.target.value as Branch | '' })}>
+        <label htmlFor={id('branch')}>Branch</label>
+        <select id={id('branch')} value={draft.branch} onChange={(e) => setDraft({ ...draft, branch: e.target.value as Branch | '' })}>
           <option value="">Any</option>
           {BRANCHES.map((b) => <option key={b} value={b}>{BRANCH_LABELS[b]}</option>)}
         </select>
       </div>
       <div className="field">
-        <label htmlFor="sort">Sort</label>
-        <select id="sort" value={sort} onChange={(e) => onSort(e.target.value)}>
+        <label htmlFor={id('sort')}>Sort</label>
+        <select id={id('sort')} value={sort} onChange={(e) => onSort(e.target.value)}>
           <option value="deadline,asc">Deadline (soonest)</option>
           <option value="createdAt,desc">Newest</option>
         </select>

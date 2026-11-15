@@ -93,6 +93,9 @@ public class CommonSecurityConfiguration {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(a -> a
                         .requestMatchers(publicPaths.toArray(String[]::new)).permitAll()
+                        // Checked before argument binding, so non-admins never see body-validation errors
+                        // (security review F9). Method-level @PreAuthorize rules still apply.
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(o -> o
                         .jwt(j -> j.jwtAuthenticationConverter(roleConverter()))
