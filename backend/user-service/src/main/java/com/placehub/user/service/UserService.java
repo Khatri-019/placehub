@@ -32,11 +32,14 @@ public class UserService {
     private final UserRepository users;
     private final StudentDetailsRepository students;
     private final RecruiterDetailsRepository recruiters;
+    private final ResumeService resumes;
 
-    public UserService(UserRepository users, StudentDetailsRepository students, RecruiterDetailsRepository recruiters) {
+    public UserService(UserRepository users, StudentDetailsRepository students, RecruiterDetailsRepository recruiters,
+                       ResumeService resumes) {
         this.users = users;
         this.students = students;
         this.recruiters = recruiters;
+        this.resumes = resumes;
     }
 
     @Transactional(readOnly = true)
@@ -92,6 +95,6 @@ public class UserService {
                 .orElseThrow(() -> ApiException.notFound("Student not found"));
         StudentDetails details = students.findById(id)
                 .orElseThrow(() -> ApiException.notFound("Student not found"));
-        return UserMapper.toAcademicProfile(user, details);
+        return UserMapper.toAcademicProfile(user, details, resumes.currentResumeId(id));
     }
 }

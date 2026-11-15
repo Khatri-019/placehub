@@ -93,6 +93,8 @@ test('admin pages load with live data', async ({ page }) => {
   await page.getByRole('button', { name: 'Search' }).click();
   await expect(page.getByRole('cell', { name: SEEDED.student, exact: true })).toBeVisible();
   await page.goto('/admin/jobs');
+  await page.getByLabel('Search', { exact: true }).fill('Graduate Software Engineer');
+  await page.getByRole('button', { name: 'Search' }).click();
   await expect(page.getByRole('cell', { name: 'Graduate Software Engineer' }).first()).toBeVisible();
   await page.goto('/admin/applications');
   await expect(page.getByRole('heading', { level: 1, name: /applications/i })).toBeVisible();

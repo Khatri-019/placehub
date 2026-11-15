@@ -7,6 +7,7 @@ import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
@@ -37,6 +38,18 @@ public class DependencyGateway {
 
     public ClientDtos.AcademicProfile academicProfile(UUID studentId) {
         return call(userBreaker, () -> userClient.academicProfile(studentId), "Student profile not found");
+    }
+
+    /** Marks the resume version as captured by an application (it can then never be deleted). */
+    public void referenceResume(UUID studentId, UUID resumeId) {
+        call(userBreaker, () -> {
+            userClient.referenceResume(studentId, resumeId);
+            return null;
+        }, "Resume not found");
+    }
+
+    public ResponseEntity<byte[]> resumeFile(UUID studentId, UUID resumeId) {
+        return call(userBreaker, () -> userClient.resumeFile(studentId, resumeId), "Resume not found");
     }
 
     public ClientDtos.EligibilityResult validateEligibility(UUID jobId, ClientDtos.EligibilityCheck check) {

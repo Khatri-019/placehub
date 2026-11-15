@@ -29,10 +29,24 @@ public final class ApplicationDtos {
                                       String jobTitle, String companyName, String studentName, String studentEmail,
                                       String branch, BigDecimal cgpa, int graduationYear, int backlogCount,
                                       ApplicationStatus status, String recruiterNote, Instant appliedAt,
-                                      Instant updatedAt, BigDecimal ctcLpa, String employmentType) {
+                                      Instant updatedAt, BigDecimal ctcLpa, String employmentType,
+                                      boolean hasResume) {
     }
 
-    public record EligibilityPreview(UUID jobId, boolean eligible, List<String> reasons, boolean alreadyApplied) {
+    /**
+     * Apply preview. {@code eligible}/{@code reasons} keep their v2 meaning (Job Service criteria only); the v3 fields
+     * describe every other requirement so the UI can show everything before Apply.
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record EligibilityPreview(UUID jobId, boolean eligible, List<String> reasons, boolean alreadyApplied,
+                                     boolean resumeRequired, boolean hasResume, boolean canApply,
+                                     List<Map<String, String>> violations, Object policy, Object consent,
+                                     Object placementState) {
+
+        public EligibilityPreview(UUID jobId, boolean eligible, List<String> reasons, boolean alreadyApplied) {
+            this(jobId, eligible, reasons, alreadyApplied, false, false, eligible && !alreadyApplied, List.of(), null,
+                    null, null);
+        }
     }
 
     public record StatusStats(long total, Map<ApplicationStatus, Long> byStatus) {

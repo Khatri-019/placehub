@@ -20,6 +20,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.LinkedHashMap;
@@ -79,6 +81,18 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({MissingServletRequestParameterException.class, MissingRequestHeaderException.class})
     public ResponseEntity<ApiError> handleMissing(Exception ex, HttpServletRequest request) {
         return respond(HttpStatus.BAD_REQUEST, ex.getMessage(), request, null);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiError> handleTooLarge(MaxUploadSizeExceededException ex, HttpServletRequest request) {
+        return respond(HttpStatus.PAYLOAD_TOO_LARGE, "Uploads must be 2 MB or smaller", request, null);
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiError> handleMissingPart(MissingServletRequestPartException ex,
+                                                      HttpServletRequest request) {
+        return respond(HttpStatus.BAD_REQUEST, "Missing multipart field '" + ex.getRequestPartName() + "'", request,
+                null);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

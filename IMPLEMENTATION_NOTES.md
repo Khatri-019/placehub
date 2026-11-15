@@ -127,5 +127,33 @@ Longer rationale for decisions. Operational status lives in `CLAUDE.md`; the spe
 33. Playwright fix (a test bug, not an app bug): the admin users table is newest-first, so the test searches for the
     seeded student instead of expecting it on page 1.
 
+### 9.2 Resumes
+34. **Storage.** A `resumes` bytea table in users-db, with a partial unique index guaranteeing one current version
+    per user. Listings use a Spring Data interface projection, so metadata queries never load the PDF bytes.
+35. **Delete rule across services.** User Service cannot see applications, so Application Service calls
+    `POST /internal/users/{u}/resumes/{r}/reference` while applying (the existing application-to-user direction). A
+    referenced version can never be deleted (409) or pruned. Pruning keeps the newest 3 versions plus referenced
+    ones.
+36. **Validation.** The `%PDF-` magic bytes are authoritative. The declared type must be pdf, x-pdf or octet-stream
+    (anything else is 415). The size limit is exactly 2 097 152 bytes (larger is 413). Filenames keep only the last
+    path segment, allow `[A-Za-z0-9._ ()-]`, and are capped at 100 characters ending in `.pdf`. Bug found by
+    `ResumeValidatorTest`: leading dots were stripped before the `.pdf` suffix, so `....pdf` became `pdf.pdf`; the
+    order is now fixed.
+37. **Body limits.** The gateway sets a 1 MB `RequestSize` on every route and 2.2 MB on a dedicated
+    `POST /api/users/me/resume` route (`order(-1)`). User Service multipart is 2 MB per file and 2.2 MB per request.
+    `MaxUploadSizeExceededException` maps to 413.
+38. **422 shape.** A new `Violations` collector puts every failing reason in one 422: `details.reasons` (strings,
+    unchanged) plus `details.violations[{code,message}]`. Its headline is "You are not eligible for this job" when any
+    NOT_ELIGIBLE reason exists (as in v2), otherwise the single violation's message.
+39. **Downloads.** `PdfDownloads` (common) sets `application/pdf`, `attachment; filename*=UTF-8''...`, `nosniff`, and
+    `private, no-store`. The frontend fetches the PDF with axios (`responseType: blob`) and opens a blob URL. The tab
+    opens synchronously so pop-up blockers allow it.
+40. **Smoke on Windows.** Native curl can't read MSYS `/tmp` paths inside `-F file=@...`, so the script converts the
+    path with `cygpath -m` when it's available. The smoke student now uploads a resume first, because resumes are
+    required by default.
+41. **Playwright.** Headless Chromium downloads PDFs instead of rendering them, so the resume test asserts the
+    authenticated blob fetch (bearer header, no token in the URL, `application/pdf`, `nosniff`) and the popup, not
+    the popup's URL. The admin jobs test searches instead of expecting the seeded job on page 1.
+
 ## Checklist (mirrors spec section 17; proof recorded in CLAUDE.md)
 See `CLAUDE.md` section 4.

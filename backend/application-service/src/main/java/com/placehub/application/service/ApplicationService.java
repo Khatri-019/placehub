@@ -52,21 +52,30 @@ public class ApplicationService {
 
     // ------------------------------------------------------------------ student
 
-    // UNPROCESSABLE_ENTITY (deprecated alias in Spring 7) keeps the reason phrase used by the spec's error example.
-    @SuppressWarnings("deprecation")
+    /** Resume requirement; 9.3 replaces this constant with the active placement policy's resumeRequired. */
+    static final boolean RESUME_REQUIRED_DEFAULT = true;
+
     public ApplicationResponse apply(AuthUser student, UUID jobId) {
         requireStudent(student);
         ClientDtos.AcademicProfile profile = activeProfile(student);
         ClientDtos.EligibilityResult result = dependencies.validateEligibility(jobId, toCheck(profile));
+        Violations violations = new Violations();
         if (!result.eligible()) {
-            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, NOT_ELIGIBLE,
-                    Map.of("reasons", result.reasons() == null ? List.of() : result.reasons()));
+            violations.addAll(Violations.Code.NOT_ELIGIBLE, result.reasons() == null ? List.of() : result.reasons());
         }
+        if (RESUME_REQUIRED_DEFAULT && profile.currentResumeId() == null) {
+            violations.add(Violations.Code.RESUME_REQUIRED, Violations.RESUME_REQUIRED_MESSAGE);
+        }
+        violations.throwIfAny();
         ClientDtos.JobSummary job = dependencies.jobSummary(jobId);
         Application application = new Application(UUID.randomUUID(), jobId, student.id(),
                 job.recruiterOwnerUserId(), job.title(), job.companyName(), profile.fullName(), profile.email(),
                 profile.branch(), profile.cgpa(), profile.graduationYear(), profile.backlogCount());
         application.snapshotJobTerms(job.ctcLpa(), job.employmentType());
+        if (profile.currentResumeId() != null) {
+            application.snapshotResume(profile.currentResumeId());
+            dependencies.referenceResume(student.id(), profile.currentResumeId());
+        }
         try {
             return ApplicationMapper.toResponse(writer.create(application), false);
         } catch (DataIntegrityViolationException e) {
@@ -79,8 +88,17 @@ public class ApplicationService {
         ClientDtos.AcademicProfile profile = activeProfile(student);
         ClientDtos.EligibilityResult result = dependencies.validateEligibility(jobId, toCheck(profile));
         boolean alreadyApplied = applications.existsByJobIdAndStudentUserId(jobId, student.id());
-        return new EligibilityPreview(jobId, result.eligible(),
-                result.reasons() == null ? List.of() : result.reasons(), alreadyApplied);
+        List<String> reasons = result.reasons() == null ? List.of() : result.reasons();
+        boolean hasResume = profile.currentResumeId() != null;
+        Violations violations = new Violations();
+        violations.addAll(Violations.Code.NOT_ELIGIBLE, reasons);
+        if (RESUME_REQUIRED_DEFAULT && !hasResume) {
+            violations.add(Violations.Code.RESUME_REQUIRED, Violations.RESUME_REQUIRED_MESSAGE);
+        }
+        List<Map<String, String>> codes = violations.list().stream()
+                .map(v -> Map.of("code", v.code().name(), "message", v.message())).toList();
+        return new EligibilityPreview(jobId, result.eligible(), reasons, alreadyApplied, RESUME_REQUIRED_DEFAULT,
+                hasResume, violations.isEmpty() && !alreadyApplied, codes, null, null, null);
     }
 
     public PageResponse<ApplicationResponse> mine(AuthUser student, ApplicationStatus status, Integer page,
@@ -117,6 +135,25 @@ public class ApplicationService {
             throw notFound();
         }
         return ApplicationMapper.toResponse(application, !isStudentOwner);
+    }
+
+    /**
+     * Streams the resume version captured by the application. Same visibility as {@link #get}: owning student, owning
+     * recruiter or admin; anyone else gets 404, so ids cannot be probed (spec 20.2 IDOR rule).
+     */
+    public org.springframework.http.ResponseEntity<byte[]> resume(AuthUser viewer, UUID applicationId) {
+        Application application = applications.findById(applicationId).orElseThrow(ApplicationService::notFound);
+        boolean isStudentOwner = viewer.isStudent() && application.getStudentUserId().equals(viewer.id());
+        if (!isStudentOwner && !isRecruiterOwner(viewer, application) && !viewer.isAdmin()) {
+            throw notFound();
+        }
+        if (application.getResumeIdSnapshot() == null) {
+            throw ApiException.notFound("No resume was attached to this application");
+        }
+        var upstream = dependencies.resumeFile(application.getStudentUserId(), application.getResumeIdSnapshot());
+        byte[] body = upstream.getBody() == null ? new byte[0] : upstream.getBody();
+        String filename = com.placehub.common.web.PdfDownloads.filenameOf(upstream.getHeaders());
+        return com.placehub.common.web.PdfDownloads.attachment(body, filename);
     }
 
     // ------------------------------------------------------------------ recruiter / admin

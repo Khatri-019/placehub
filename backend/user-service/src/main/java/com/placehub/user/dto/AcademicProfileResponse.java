@@ -7,5 +7,6 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 public record AcademicProfileResponse(UUID userId, String fullName, String email, Branch branch, int graduationYear,
-                                      BigDecimal cgpa, int backlogCount, AccountStatus status) {
+                                      BigDecimal cgpa, int backlogCount, AccountStatus status,
+                                      UUID currentResumeId) {
 }

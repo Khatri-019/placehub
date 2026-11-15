@@ -116,6 +116,22 @@ class GatewaySecurityTest {
     }
 
     @Test
+    void bodiesOver1MbAreRejectedExceptOnTheResumeUploadRoute() {
+        String bearer = "Bearer " + token("STUDENT", Instant.now().plusSeconds(600));
+        byte[] body = new byte[1_500_000];
+        client.post().uri("/api/auth/login").header(HttpHeaders.CONTENT_TYPE, "application/json")
+                .bodyValue(body).exchange()
+                .expectStatus().isEqualTo(413);
+        // Resume upload allows up to 2.2 MB; with no instances registered it reaches the load balancer (503, not 413).
+        client.post().uri("/api/users/me/resume").header(HttpHeaders.AUTHORIZATION, bearer)
+                .header(HttpHeaders.CONTENT_TYPE, "application/octet-stream").bodyValue(body).exchange()
+                .expectStatus().value(s -> assertThat(s).isNotEqualTo(413).isNotEqualTo(401));
+        client.post().uri("/api/users/me/resume").header(HttpHeaders.AUTHORIZATION, bearer)
+                .header(HttpHeaders.CONTENT_TYPE, "application/octet-stream").bodyValue(new byte[2_400_000]).exchange()
+                .expectStatus().isEqualTo(413);
+    }
+
+    @Test
     void gatewayHealthIsPublic() {
         client.get().uri("/actuator/health").exchange().expectStatus().value(s -> assertThat(s).isNotEqualTo(401));
     }

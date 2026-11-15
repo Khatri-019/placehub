@@ -1,4 +1,5 @@
 import { userApi } from '../../api/endpoints';
+import { ResumeCard } from '../../components/ResumeCard';
 import { AsyncView } from '../../components/States';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useAsync } from '../../hooks/useAsync';
@@ -32,6 +33,9 @@ export function StudentProfile() {
           </section>
         )}
       </AsyncView>
+      <div style={{ marginTop: 'var(--space-5)' }}>
+        <ResumeCard />
+      </div>
     </div>
   );
 }

@@ -18,6 +18,6 @@ public final class ApplicationMapper {
                 a.getStudentEmailSnapshot(), a.getBranchSnapshot(), a.getCgpaSnapshot(),
                 a.getGraduationYearSnapshot(), a.getBacklogCountSnapshot(), a.getStatus(),
                 includeRecruiterNote ? a.getRecruiterNote() : null, a.getAppliedAt(), a.getUpdatedAt(),
-                a.getCtcLpaSnapshot(), a.getEmploymentTypeSnapshot());
+                a.getCtcLpaSnapshot(), a.getEmploymentTypeSnapshot(), a.getResumeIdSnapshot() != null);
     }
 }

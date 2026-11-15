@@ -46,6 +46,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options;
@@ -105,6 +106,7 @@ class ApplicationServiceIT {
 
     UUID studentId;
     UUID jobId;
+    UUID resumeId;
     final UUID recruiterId = UUID.randomUUID();
 
     static String token(UUID sub, String role) {
@@ -118,11 +120,21 @@ class ApplicationServiceIT {
     void stubs() {
         studentId = UUID.randomUUID();
         jobId = UUID.randomUUID();
+        resumeId = UUID.randomUUID();
         wiremock.stubFor(get(urlEqualTo("/internal/users/" + studentId + "/academic-profile"))
                 .withHeader("X-Internal-Token", equalTo("it-internal-token"))
                 .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("""
                         {"userId":"%s","fullName":"IT Student","email":"it@x.com","branch":"CSE",
-                         "graduationYear":2027,"cgpa":8.4,"backlogCount":0,"status":"ACTIVE"}""".formatted(studentId))));
+                         "graduationYear":2027,"cgpa":8.4,"backlogCount":0,"status":"ACTIVE",
+                         "currentResumeId":"%s"}""".formatted(studentId, resumeId))));
+        wiremock.stubFor(post(urlEqualTo("/internal/users/" + studentId + "/resumes/" + resumeId + "/reference"))
+                .withHeader("X-Internal-Token", equalTo("it-internal-token"))
+                .willReturn(aResponse().withStatus(204)));
+        wiremock.stubFor(get(urlEqualTo("/internal/users/" + studentId + "/resumes/" + resumeId + "/file"))
+                .withHeader("X-Internal-Token", equalTo("it-internal-token"))
+                .willReturn(aResponse().withHeader("Content-Type", "application/pdf")
+                        .withHeader("Content-Disposition", "attachment; filename=\"it-cv.pdf\"")
+                        .withBody("%PDF-1.4 it resume")));
         wiremock.stubFor(post(urlEqualTo("/internal/jobs/" + jobId + "/validate-eligibility"))
                 .willReturn(aResponse().withHeader("Content-Type", "application/json")
                         .withBody("{\"jobId\":\"" + jobId + "\",\"eligible\":true,\"reasons\":[]}")));
@@ -182,6 +194,42 @@ class ApplicationServiceIT {
         ConsumerRecord<String, String> changed = pollFor(ApplicationEvents.STATUS_CHANGED_TOPIC,
                 applicationId.toString());
         assertThat(json.readTree(changed.value()).get("newStatus").asString()).isEqualTo("SHORTLISTED");
+    }
+
+    @Test
+    void resumeSnapshotIsStreamedOnlyToParticipants() throws Exception {
+        JsonNode created = json.readTree(apply(jobId, token(studentId, "STUDENT"), 201));
+        String appId = created.get("id").asString();
+        assertThat(created.get("hasResume").asBoolean()).isTrue();
+        wiremock.verify(postRequestedFor(urlEqualTo("/internal/users/" + studentId + "/resumes/" + resumeId + "/reference")));
+        assertThat(applications.findById(UUID.fromString(appId)).orElseThrow().getResumeIdSnapshot()).isEqualTo(resumeId);
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/applications/" + appId + "/resume")
+                        .header("Authorization", token(recruiterId, "RECRUITER")))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Type", "application/pdf"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Cache-Control",
+                        org.hamcrest.Matchers.containsString("no-store")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string("%PDF-1.4 it resume"));
+        // IDOR: a different recruiter and a different student get 404.
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/applications/" + appId + "/resume")
+                        .header("Authorization", token(UUID.randomUUID(), "RECRUITER")))
+                .andExpect(status().isNotFound());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/applications/" + appId + "/resume")
+                        .header("Authorization", token(UUID.randomUUID(), "STUDENT")))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void missingResumeIs422WithResumeRequiredCode() throws Exception {
+        UUID noResumeStudent = UUID.randomUUID();
+        wiremock.stubFor(get(urlEqualTo("/internal/users/" + noResumeStudent + "/academic-profile"))
+                .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("""
+                        {"userId":"%s","fullName":"No CV","email":"n@x.com","branch":"CSE",
+                         "graduationYear":2027,"cgpa":8.4,"backlogCount":0,"status":"ACTIVE"}""".formatted(noResumeStudent))));
+        JsonNode error = json.readTree(apply(jobId, token(noResumeStudent, "STUDENT"), 422));
+        assertThat(error.get("details").get("violations").get(0).get("code").asString()).isEqualTo("RESUME_REQUIRED");
+        assertThat(error.get("message").asString()).isEqualTo("Upload your resume before applying");
     }
 
     @Test

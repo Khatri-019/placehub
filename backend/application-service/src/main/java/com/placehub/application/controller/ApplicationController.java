@@ -87,6 +87,11 @@ public class ApplicationController {
         return service.get(AuthUser.from(jwt), id);
     }
 
+    @GetMapping("/api/applications/{id}/resume")
+    public ResponseEntity<byte[]> resume(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        return service.resume(AuthUser.from(jwt), id);
+    }
+
     @PatchMapping("/api/applications/{id}/withdraw")
     @PreAuthorize("hasRole('STUDENT')")
     public ApplicationResponse withdraw(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {

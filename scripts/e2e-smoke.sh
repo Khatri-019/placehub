@@ -19,7 +19,7 @@ for tool in curl jq; do
 done
 
 TMP_BODY="$(mktemp)"
-trap 'rm -f "$TMP_BODY"' EXIT
+trap 'rm -f "$TMP_BODY" "${RESUME_FILE:-}"' EXIT
 PASSES=0
 FAILS=0
 CODE=""
@@ -52,6 +52,20 @@ future_iso() { date -u -d "+$1 days" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -
 register_student() { # email cgpa branch
   req POST /api/auth/register/student "" "{\"fullName\":\"Smoke Student\",\"email\":\"$1\",\"password\":\"Smoke12345\",
     \"collegeName\":\"Smoke Institute\",\"branch\":\"$3\",\"graduationYear\":2027,\"cgpa\":$2,\"backlogCount\":0}"
+}
+
+RESUME_FILE="$(mktemp)"
+printf '%%PDF-1.4\n%% PlaceHub smoke resume\ntrailer<</Root 1 0 R>>\n%%%%EOF\n' > "$RESUME_FILE"
+
+RESUME_ARG="$RESUME_FILE"
+# Git Bash on Windows: native curl cannot open MSYS paths inside -F, so pass a mixed-style path.
+command -v cygpath >/dev/null 2>&1 && RESUME_ARG="$(cygpath -m "$RESUME_FILE")"
+
+upload_resume() { # token -> sets CODE and BODY
+  CODE="$(curl -s -o "$TMP_BODY" -w '%{http_code}' -X POST "$BASE/api/users/me/resume" \
+    -H "Authorization: Bearer $1" -H "X-Correlation-Id: smoke-$RUN_ID" \
+    -F "file=@$RESUME_ARG;type=application/pdf;filename=smoke-resume.pdf" 2>/dev/null || echo 000)"
+  BODY="$(cat "$TMP_BODY" 2>/dev/null || true)"
 }
 
 register_recruiter() { # email
@@ -107,6 +121,8 @@ expect_code 201 "student registration"
 STUDENT_ID="$(json '.id')"
 STUDENT_TOKEN="$(login "$STUDENT_EMAIL" Smoke12345)"
 [ -n "$STUDENT_TOKEN" ] && pass "student login returns a token" || fail "student login" "$BODY"
+upload_resume "$STUDENT_TOKEN"
+expect_code 201 "student uploads a PDF resume (v3: resumes are required to apply by default)"
 
 step 2 "Recruiter registers and logs in"
 register_recruiter "$RECRUITER_EMAIL"

@@ -54,7 +54,11 @@ Phase 9 (v3, BUILD_SPEC §20):
 - [x] 9.1 Numeric CTC — job V2 migration + app V2 snapshots; JobServiceTest +3 (publish rule, summary), JobServiceIT
       summary ctc/type + Meridian; job+app modules 132 tests pass, user-service verify pass; compose: recruiter2 sees
       Quant 30.00/Senior DE 20.00, seeded CTCs 12/8/18, intern null; smoke 34/34; Playwright 8/8
-- [ ] 9.2 Resume upload/download, IDOR-safe application resume, frontend resume card
+- [x] 9.2 Resumes — user V2 `resumes`, app V3 `resume_id_snapshot`; ResumeValidatorTest 6 (magic bytes, 2 MB
+      boundary, 415/413/400, traversal); UserServiceIT +2 (upload/download headers, 415, 413, prune 3 + referenced,
+      409 delete, owner-scoped internal stream, other student 404, recruiter 403); ApplicationServiceTest +4 (IDOR
+      outsiders 404 first, snapshot + pin, RESUME_REQUIRED with NOT_ELIGIBLE in one 422); ApplicationServiceIT +2;
+      Gateway 1 MB / 2.2 MB RequestSize test; smoke 35/35; Playwright 10/10 (resume.spec 2)
 - [ ] 9.3 Placement policy engine (versions, evaluator, consent, placements, locks, audit, admin UI)
 - [ ] 9.4 Auto-shortlisting, status history, bulk status, auto-screen
 - [ ] 9.5 Separate login portals (backend portal check + UI routes)
@@ -65,7 +69,7 @@ Phase 9 (v3, BUILD_SPEC §20):
 Definition of Done (v2 §17): all [x] (see git history of this file). Frontend click-through gap closes with Playwright.
 
 ## 5. Current state
-- Phase 9.2 (resumes) next. Stack running in compose with 9.1 images.
+- Phase 9.3 (placement policy engine) next. Stack running with 9.2 images.
 
 ## 6. Known issues / deviations from spec
 - Java 25 instead of 21 (user edit). VS Code redhat.java may race on `target/` → rerun `./mvnw clean verify`.

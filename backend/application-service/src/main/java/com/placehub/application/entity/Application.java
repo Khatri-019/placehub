@@ -66,6 +66,10 @@ public class Application {
     @Column(name = "employment_type_snapshot", length = 20)
     private String employmentTypeSnapshot;
 
+    /** Resume version captured at apply time (spec 20.2); later uploads never change what the recruiter receives. */
+    @Column(name = "resume_id_snapshot")
+    private UUID resumeIdSnapshot;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ApplicationStatus status;
@@ -116,6 +120,14 @@ public class Application {
     }
 
     /** Job compensation snapshot taken at apply time (spec 20.1); never changes afterwards. */
+    public void snapshotResume(UUID resumeId) {
+        this.resumeIdSnapshot = resumeId;
+    }
+
+    public UUID getResumeIdSnapshot() {
+        return resumeIdSnapshot;
+    }
+
     public void snapshotJobTerms(BigDecimal ctcLpa, String employmentType) {
         this.ctcLpaSnapshot = ctcLpa;
         this.employmentTypeSnapshot = employmentType;

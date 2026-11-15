@@ -16,7 +16,9 @@ export function StudentJobDetails() {
   const [busy, setBusy] = useState(false);
   const [applyError, setApplyError] = useState<ParsedError | null>(null);
 
-  const canApply = !!eligibility.data && eligibility.data.eligible && !eligibility.data.alreadyApplied;
+  const preview = eligibility.data;
+  const canApply = !!preview && (preview.canApply ?? (preview.eligible && !preview.alreadyApplied));
+  const missingResume = !!preview && preview.resumeRequired && !preview.hasResume && !preview.alreadyApplied;
 
   const onApply = async () => {
     setBusy(true);
@@ -64,6 +66,11 @@ export function StudentJobDetails() {
             <aside className="stack">
               <EligibilityPanel preview={eligibility.data} loading={eligibility.loading} error={eligibility.error}
                 onRetry={eligibility.reload} />
+              {missingResume && (
+                <div className="banner" role="status">
+                  Upload your resume before applying. <Link to="/student/profile">Go to your profile</Link>
+                </div>
+              )}
               {applyError && <ErrorState error={applyError} />}
               <button type="button" className="btn btn-primary" disabled={!canApply || busy} onClick={onApply}
                 aria-describedby="apply-help">

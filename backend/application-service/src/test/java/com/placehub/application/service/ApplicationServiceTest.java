@@ -44,9 +44,11 @@ class ApplicationServiceTest {
     DependencyGateway deps = mock(DependencyGateway.class);
     ApplicationService service = new ApplicationService(repo, writer, deps);
 
+    final UUID resumeId = UUID.randomUUID();
+
     ClientDtos.AcademicProfile profile(String status) {
         return new ClientDtos.AcademicProfile(student.id(), "Asha", "s@x.com", "CSE", 2027, new BigDecimal("8.60"),
-                0, status);
+                0, status, resumeId);
     }
 
     Application existing(ApplicationStatus status) {
@@ -108,6 +110,69 @@ class ApplicationServiceTest {
                             .containsExactly("Minimum CGPA required is 7.50; yours is 6.90");
                 });
         verify(writer, never()).create(any());
+    }
+
+    @Test
+    void resumeIsSnapshotAndPinnedAtApplyTime() {
+        when(deps.validateEligibility(eq(jobId), any())).thenReturn(
+                new ClientDtos.EligibilityResult(jobId, true, List.of()));
+        var res = service.apply(student, jobId);
+        assertThat(res.hasResume()).isTrue();
+        verify(deps).referenceResume(student.id(), resumeId);
+        org.mockito.ArgumentCaptor<Application> saved = org.mockito.ArgumentCaptor.forClass(Application.class);
+        verify(writer).create(saved.capture());
+        assertThat(saved.getValue().getResumeIdSnapshot()).isEqualTo(resumeId);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void missingResumeIs422ResumeRequiredTogetherWithEligibilityReasons() {
+        when(deps.academicProfile(student.id())).thenReturn(new ClientDtos.AcademicProfile(student.id(), "Asha",
+                "s@x.com", "CSE", 2027, new BigDecimal("8.60"), 0, "ACTIVE", null));
+        when(deps.validateEligibility(eq(jobId), any())).thenReturn(new ClientDtos.EligibilityResult(jobId, false,
+                List.of("Minimum CGPA required is 9.00; yours is 8.60")));
+        assertThatThrownBy(() -> service.apply(student, jobId))
+                .satisfies(e -> {
+                    assertThat(status(e)).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+                    Map<String, Object> d = ((ApiException) e).getDetails();
+                    assertThat((List<String>) d.get("reasons")).containsExactly(
+                            "Minimum CGPA required is 9.00; yours is 8.60", "Upload your resume before applying");
+                    assertThat((List<Map<String, String>>) d.get("violations")).extracting(m -> m.get("code"))
+                            .containsExactly("NOT_ELIGIBLE", "RESUME_REQUIRED");
+                });
+        verify(writer, never()).create(any());
+        verify(deps, never()).referenceResume(any(), any());
+    }
+
+    @Test
+    void resumeDownloadIsDeniedWith404ToAnyoneOutsideTheApplication() {
+        Application a = existing(ApplicationStatus.APPLIED);
+        a.snapshotResume(resumeId);
+        // IDOR: another recruiter, another student and an unrelated recruiter id must never get the file.
+        for (AuthUser outsider : List.of(otherRecruiter, otherStudent,
+                new AuthUser(UUID.randomUUID(), AuthUser.RECRUITER, "x@x.com", "X"))) {
+            assertThatThrownBy(() -> service.resume(outsider, a.getId()))
+                    .satisfies(e -> assertThat(status(e)).isEqualTo(HttpStatus.NOT_FOUND));
+        }
+        verify(deps, never()).resumeFile(any(), any());
+        org.springframework.http.HttpHeaders h = new org.springframework.http.HttpHeaders();
+        h.setContentDisposition(org.springframework.http.ContentDisposition.attachment().filename("cv.pdf").build());
+        when(deps.resumeFile(student.id(), resumeId)).thenReturn(
+                new org.springframework.http.ResponseEntity<>("%PDF-1.4".getBytes(), h, HttpStatus.OK));
+        for (AuthUser allowed : List.of(student, recruiter, admin)) {
+            var res = service.resume(allowed, a.getId());
+            assertThat(res.getHeaders().getContentType()).hasToString("application/pdf");
+            assertThat(res.getHeaders().getFirst("X-Content-Type-Options")).isEqualTo("nosniff");
+            assertThat(res.getHeaders().getContentDisposition().getFilename()).isEqualTo("cv.pdf");
+        }
+        verify(deps, org.mockito.Mockito.times(3)).resumeFile(student.id(), resumeId);
+    }
+
+    @Test
+    void resumeDownloadWithoutSnapshotIs404() {
+        Application a = existing(ApplicationStatus.APPLIED);
+        assertThatThrownBy(() -> service.resume(student, a.getId()))
+                .satisfies(e -> assertThat(status(e)).isEqualTo(HttpStatus.NOT_FOUND));
     }
 
     @Test

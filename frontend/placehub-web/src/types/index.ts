@@ -150,13 +150,44 @@ export interface Application {
   updatedAt: string;
   ctcLpa?: number | null;
   employmentType?: EmploymentType | null;
+  hasResume?: boolean;
+}
+
+export type ViolationCode =
+  | 'NOT_ELIGIBLE' | 'RESUME_REQUIRED' | 'POLICY_BLOCKED' | 'CONSENT_REQUIRED' | 'STUDENT_LOCKED'
+  | 'CONSENT_LIMIT_REACHED';
+
+export interface Violation {
+  code: ViolationCode;
+  message: string;
 }
 
 export interface EligibilityPreview {
   jobId: string;
+  /** Job Service criteria only (v2 meaning). */
   eligible: boolean;
   reasons: string[];
   alreadyApplied: boolean;
+  resumeRequired?: boolean;
+  hasResume?: boolean;
+  /** True when every requirement (criteria, resume, policy) is met and the student has not applied yet. */
+  canApply?: boolean;
+  violations?: Violation[];
+}
+
+export interface ResumeMetadata {
+  id: string;
+  filename: string;
+  sizeBytes: number;
+  sha256: string;
+  uploadedAt: string;
+  current: boolean;
+  referenced: boolean;
+}
+
+export interface ResumeOverview {
+  current: ResumeMetadata;
+  versions: ResumeMetadata[];
 }
 
 export interface StatusStats {

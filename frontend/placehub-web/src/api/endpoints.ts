@@ -2,7 +2,7 @@ import { api } from './client';
 import type {
   AccountStatus, Application, ApplicationStatus, Branch, Company, CompanyRequest, EligibilityPreview,
   EmploymentType, Job, JobRequest, JobStatus, LoginResponse, Notification, Page, RecruiterRegistration, Role,
-  StatusStats, StudentRegistration, User,
+  ResumeMetadata, ResumeOverview, StatusStats, StudentRegistration, User,
 } from '../types';
 
 type Params = Record<string, string | number | boolean | undefined>;
@@ -28,6 +28,25 @@ export const userApi = {
     api.get<Page<User>>('/api/admin/users', { params: clean(p) }).then((r) => r.data),
   setStatus: (id: string, status: 'ACTIVE' | 'DEACTIVATED') =>
     api.patch<User>(`/api/admin/users/${id}/status`, { status }).then((r) => r.data),
+};
+
+export const resumeApi = {
+  /** Resolves to null when the student has not uploaded a resume yet. */
+  get: () =>
+    api.get<ResumeOverview>('/api/users/me/resume').then((r) => r.data).catch((err) => {
+      if (err?.response?.status === 404) return null;
+      throw err;
+    }),
+  upload: (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.post<ResumeMetadata>('/api/users/me/resume', form, { headers: { 'Content-Type': 'multipart/form-data' } })
+      .then((r) => r.data);
+  },
+  remove: (id: string) => api.delete(`/api/users/me/resume/${id}`),
+  /** PDF bytes fetched with the bearer header; never put the token in a URL. */
+  currentBlob: () => api.get<Blob>('/api/users/me/resume/file', { responseType: 'blob' }).then((r) => r.data),
+  versionBlob: (id: string) => api.get<Blob>(`/api/users/me/resume/${id}/file`, { responseType: 'blob' }).then((r) => r.data),
 };
 
 // ---------------------------------------------------------------- companies & jobs (job-service)
@@ -70,6 +89,8 @@ export const applicationApi = {
   mine: (p: { status?: ApplicationStatus | ''; page?: number; size?: number }) =>
     api.get<Page<Application>>('/api/applications/me', { params: clean(p) }).then((r) => r.data),
   get: (id: string) => api.get<Application>(`/api/applications/${id}`).then((r) => r.data),
+  resumeBlob: (id: string) =>
+    api.get<Blob>(`/api/applications/${id}/resume`, { responseType: 'blob' }).then((r) => r.data),
   withdraw: (id: string) => api.patch<Application>(`/api/applications/${id}/withdraw`).then((r) => r.data),
   forJob: (jobId: string, p: { status?: ApplicationStatus | ''; page?: number; size?: number }) =>
     api.get<Page<Application>>(`/api/applications/job/${jobId}`, { params: clean(p) }).then((r) => r.data),

@@ -13,7 +13,13 @@ public final class ClientDtos {
 
     /** User Service GET /internal/users/{id}/academic-profile. */
     public record AcademicProfile(UUID userId, String fullName, String email, String branch, int graduationYear,
-                                  BigDecimal cgpa, int backlogCount, String status) {
+                                  BigDecimal cgpa, int backlogCount, String status, UUID currentResumeId) {
+
+        /** Constructor for callers that predate v3 (no resume). */
+        public AcademicProfile(UUID userId, String fullName, String email, String branch, int graduationYear,
+                               BigDecimal cgpa, int backlogCount, String status) {
+            this(userId, fullName, email, branch, graduationYear, cgpa, backlogCount, status, null);
+        }
     }
 
     /** Job Service POST /internal/jobs/{id}/validate-eligibility request. */

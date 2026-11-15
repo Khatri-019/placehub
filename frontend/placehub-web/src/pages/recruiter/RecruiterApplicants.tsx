@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { applicationApi, jobApi } from '../../api/endpoints';
+import { parseError } from '../../api/errors';
+import { emitToast } from '../../components/toastBus';
+import { openPdfInNewTab } from '../../utils/openBlob';
 import { Pagination } from '../../components/Pagination';
 import { AsyncView, EmptyState } from '../../components/States';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -49,7 +52,19 @@ export function RecruiterApplicants() {
                       <td>{a.backlogCount}</td>
                       <td><StatusBadge status={a.status} /></td>
                       <td>{formatDateTime(a.appliedAt)}</td>
-                      <td><Link className="btn btn-secondary btn-sm" to={`/recruiter/applications/${a.id}`}>Review</Link></td>
+                      <td>
+                        <div className="button-row">
+                          <Link className="btn btn-secondary btn-sm" to={`/recruiter/applications/${a.id}`}>Review</Link>
+                          {a.hasResume && (
+                            <button type="button" className="btn btn-secondary btn-sm"
+                              aria-label={`View resume of ${a.studentName}`}
+                              onClick={() => openPdfInNewTab(() => applicationApi.resumeBlob(a.id))
+                                .catch((err) => emitToast({ kind: 'error', message: parseError(err).message }))}>
+                              View resume
+                            </button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

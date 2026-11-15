@@ -7,6 +7,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { StatusControl } from '../../components/StatusControl';
 import { emitToast } from '../../components/toastBus';
 import { useAsync } from '../../hooks/useAsync';
+import { openPdfInNewTab } from '../../utils/openBlob';
 import type { ApplicationStatus } from '../../types';
 import { BRANCH_LABELS, STATUS_LABELS } from '../../types/enums';
 import { formatCgpa, formatDateTime } from '../../utils/format';
@@ -58,6 +59,15 @@ export function RecruiterApplicationDetail() {
                 <dt>Applied</dt><dd>{formatDateTime(a.appliedAt)}</dd>
                 <dt>Last updated</dt><dd>{formatDateTime(a.updatedAt)}</dd>
               </dl>
+              {a.hasResume ? (
+                <button type="button" className="btn btn-secondary" style={{ marginTop: 'var(--space-4)' }}
+                  onClick={() => openPdfInNewTab(() => applicationApi.resumeBlob(a.id))
+                    .catch((err) => emitToast({ kind: 'error', message: parseError(err).message }))}>
+                  View resume
+                </button>
+              ) : (
+                <p className="muted small">No resume was attached to this application.</p>
+              )}
             </section>
             <section className="card stack">
               <h2>Review</h2>

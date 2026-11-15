@@ -32,8 +32,8 @@ public final class UserMapper {
                 user.getAccountStatus());
     }
 
-    public static AcademicProfileResponse toAcademicProfile(User user, StudentDetails s) {
+    public static AcademicProfileResponse toAcademicProfile(User user, StudentDetails s, java.util.UUID resumeId) {
         return new AcademicProfileResponse(user.getId(), user.getFullName(), user.getEmail(), s.getBranch(),
-                s.getGraduationYear(), s.getCgpa(), s.getBacklogCount(), user.getAccountStatus());
+                s.getGraduationYear(), s.getCgpa(), s.getBacklogCount(), user.getAccountStatus(), resumeId);
     }
 }
