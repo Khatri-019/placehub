@@ -240,6 +240,7 @@ class PolicyFlowIT {
     void autoShortlistWritesCreatedThenSystemStatusChangedInOrder() throws Exception {
         UUID app = created(apply(job("10.00", "FULL_TIME", "AUTO_SHORTLIST"), null)); // cgpa 8.4 >= 8.0
         assertThat(applications.findById(app).orElseThrow().getStatus()).isEqualTo(ApplicationStatus.SHORTLISTED);
+        assertThat(applications.findById(app).orElseThrow().isAutoShortlisted()).isTrue();
         List<OutboxEvent> events = outbox.inInsertionOrder(app);
         assertThat(events).extracting(OutboxEvent::getEventType)
                 .containsExactly(ApplicationEvents.CREATED, ApplicationEvents.STATUS_CHANGED);

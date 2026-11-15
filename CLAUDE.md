@@ -71,17 +71,28 @@ Phase 9 (v3, BUILD_SPEC §20):
       bulk per-item with foreign → NOT_FOUND, auto-screen ownership/mode, history visibility); PolicyFlowIT +1
       (CREATED then STATUS_CHANGED SYSTEM by seq, both SENT, 2-row history, manual reject, foreign 404);
       app+notif verify 178; smoke 35/35; Playwright 10/10
-- [~] 9.5 Login portals — backend done: AuthServiceTest +2 (mismatch 403 naming the right login, wrong password
-      still 401 for mismatched/unknown), UserServiceIT +1 (403/401/200/400 via MockMvc); user verify 41.
-      Portal routes/pages ship with 9.6
-- [ ] 9.6 UI redesign (tokens, components, lazy routes, size budget, Lighthouse, dark theme)
+- [x] 9.5 Login portals — AuthServiceTest +2 (mismatch 403 naming the right login, wrong password still 401 for
+      mismatched/unknown), UserServiceIT +1 (403/401/200/400); user verify 41. UI: /login chooser, /login/:portal,
+      ProtectedRoute redirects to the area's portal, logout → own portal; Login.test +2, ProtectedRoute.test +1
+- [x] 9.6 UI redesign — src/ui (Badge, Card/StatCard, DataTable, Modal/Drawer/ConfirmDialog, Tabs, Stepper/Timeline,
+      Skeleton, EmptyState, Markdown), all pages redone + admin Policy (band editor, live validation, consent preview,
+      diff, debounced draft simulator, history, audit)/Placements (lock/unlock reason, off-campus)/Consents (CSV);
+      recruiter bulk status + auto-screen + Auto badge; app V6 auto_shortlisted. React.lazy chunks per role.
+      Proof: vitest 33, lint 0, tsc 0; `npm run size` initial 109.4 KB gzip (font 47.1 KB woff2 reported apart),
+      student 16.0 / recruiter 12.9 / admin 14.3 KB incl. shared; Lighthouse flow (mobile, prod nginx) Perf/A11y/BP/
+      SEO: landing 99/100/100/100, login 97/100/100/100, student jobs 96/100/100/100, recruiter applicants
+      97/100/100/100, CLS 0.000 all; axe WCAG 2.1 AA 0 violations on 8 pages × 2 themes; Playwright 18/18;
+      app verify 143 unit + 9 IT; smoke 35/35
+      Palette (tokens.css only; no hex elsewhere): light text #1c1b2e/bg #f7f6fa 15.67:1, muted #5b5a72/white 6.67:1;
+      dark text #ecebf5/bg #14132a 15.37:1, muted #b6b4cf/#201e3e 7.91:1; white on primary #c2560f 4.53:1
 - [ ] 9.7 Security review (fresh subagent) + test-first fixes
 - [ ] 9.8 Tests, smoke, Playwright, screenshots, docs, clean final verification
 
 Definition of Done (v2 §17): all [x] (see git history of this file). Frontend click-through gap closes with Playwright.
 
 ## 5. Current state
-- Phase 9.6 (UI redesign incl. 9.3-9.5 UI) in progress. Stack running with 9.4 images (user-service 9.5 not yet rebuilt).
+- 9.6 done and committed. Next: 9.7 security review (fresh subagent, repo + permission matrix only). Stack running
+  with current images. Lighthouse: `cd scripts/lighthouse && npm install && node flow.mjs <chrome> report.html`.
 
 ## 6. Known issues / deviations from spec
 - Java 25 instead of 21 (user edit). VS Code redhat.java may race on `target/` → rerun `./mvnw clean verify`.

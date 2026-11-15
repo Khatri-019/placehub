@@ -115,6 +115,9 @@ export interface Job {
   status: JobStatus;
   createdAt: string;
   updatedAt: string;
+  screeningMode?: ScreeningMode;
+  autoShortlistMinCgpa?: number | null;
+  autoShortlistMaxBacklogs?: number | null;
 }
 
 export interface JobRequest {
@@ -129,6 +132,9 @@ export interface JobRequest {
   eligibleBranches: Branch[];
   eligibleGraduationYears: number[];
   deadline: string;
+  screeningMode?: ScreeningMode;
+  autoShortlistMinCgpa?: number;
+  autoShortlistMaxBacklogs?: number;
 }
 
 export interface Application {
@@ -151,6 +157,8 @@ export interface Application {
   ctcLpa?: number | null;
   employmentType?: EmploymentType | null;
   hasResume?: boolean;
+  policyDecision?: PolicyDecision | null;
+  autoShortlisted?: boolean;
 }
 
 export type ViolationCode =
@@ -173,6 +181,9 @@ export interface EligibilityPreview {
   /** True when every requirement (criteria, resume, policy) is met and the student has not applied yet. */
   canApply?: boolean;
   violations?: Violation[];
+  policy?: PolicyEvaluation;
+  consent?: { renderedText: string; policyVersion: number; band: string | null; ratio: number | null } | null;
+  placementState?: { currentCtc: number | null; placed: boolean; locked: boolean; summary: string };
 }
 
 export interface ResumeMetadata {
@@ -206,4 +217,129 @@ export interface Notification {
   relatedJobId?: string;
   read: boolean;
   createdAt: string;
+}
+
+// ---------------------------------------------------------------- v3 (BUILD_SPEC section 20)
+
+export type ScreeningMode = 'MANUAL' | 'AUTO_SHORTLIST';
+export type PolicyAction = 'BLOCK' | 'REQUIRE_CONSENT' | 'ALLOW';
+export type PolicyDecision = 'ALLOW' | 'REQUIRE_CONSENT' | 'BLOCK';
+
+export interface HistoryEntry {
+  fromStatus?: ApplicationStatus | null;
+  toStatus: ApplicationStatus;
+  actorType: 'USER' | 'SYSTEM';
+  actorUserId?: string | null;
+  reason?: string | null;
+  changedAt: string;
+}
+
+export interface PolicyBand {
+  fromMultiplier: number;
+  toMultiplier: number | null;
+  action: PolicyAction;
+  lockOnPlacement: boolean;
+}
+
+export interface Policy {
+  id: string;
+  version: number;
+  active: boolean;
+  bands: PolicyBand[];
+  appliesToInternships: boolean;
+  maxActiveConsents: number | null;
+  resumeRequired: boolean;
+  withdrawOtherApplicationsOnLock: boolean;
+  consentText: string;
+  effectiveFrom: string;
+  changedByUserId?: string | null;
+  changeNote: string;
+  createdAt: string;
+}
+
+export interface PolicyDraft {
+  bands: PolicyBand[];
+  appliesToInternships: boolean;
+  maxActiveConsents: number | null;
+  resumeRequired: boolean;
+  withdrawOtherApplicationsOnLock: boolean;
+  consentText: string;
+}
+
+export interface PolicyEvaluation {
+  decision: PolicyDecision;
+  reasons: { code: string; message: string }[];
+  matchedBand?: PolicyBand | null;
+  matchedBandLabel?: string | null;
+  lockOnPlacement: boolean;
+  policyVersion: number;
+  ratio?: number | null;
+}
+
+export interface Placement {
+  id: string;
+  studentUserId: string;
+  studentName: string;
+  applicationId?: string | null;
+  companyName: string;
+  ctcLpa?: number | null;
+  band?: string | null;
+  locked: boolean;
+  source: 'ON_CAMPUS' | 'OFF_CAMPUS';
+  recordedAt: string;
+  recordedBy?: string | null;
+  studentCurrentlyLocked: boolean;
+}
+
+export interface BandExplanation {
+  fromCtc: number;
+  toCtc: number | null;
+  action: PolicyAction;
+  lockOnPlacement: boolean;
+  description: string;
+}
+
+export interface PlacementStateView {
+  currentCtc: number | null;
+  placed: boolean;
+  locked: boolean;
+  lockReason?: string | null;
+  placements: Placement[];
+  policyVersion: number;
+  policyEffectiveFrom: string;
+  appliesToInternships: boolean;
+  bands: BandExplanation[];
+  summary: string;
+}
+
+export interface ConsentRecord {
+  id: string;
+  applicationId: string;
+  studentUserId: string;
+  jobId: string;
+  policyVersion: number;
+  band: string;
+  consentTextHash: string;
+  renderedText: string;
+  signedName: string;
+  acceptedAt: string;
+  clientIp?: string | null;
+  userAgent?: string | null;
+}
+
+export interface AuditEntry {
+  id: string;
+  actorUserId?: string | null;
+  action: string;
+  studentUserId?: string | null;
+  before?: string | null;
+  after?: string | null;
+  reason?: string | null;
+  createdAt: string;
+}
+
+export interface BulkResult {
+  results: { applicationId: string; success: boolean; status?: ApplicationStatus; code?: string; message?: string }[];
+  succeeded: number;
+  failed: number;
 }

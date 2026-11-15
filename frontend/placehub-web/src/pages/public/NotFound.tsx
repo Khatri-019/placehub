@@ -1,13 +1,14 @@
 import { Link } from 'react-router';
+import { AuthLayout } from '../../components/AuthLayout';
+import { EmptyState } from '../../ui/EmptyState';
 
 export function NotFound() {
   return (
-    <div className="auth-page">
-      <div className="card auth-card">
-        <h1>Page not found</h1>
-        <p className="muted">The page you are looking for does not exist or you do not have access to it.</p>
+    <AuthLayout heading="This page does not exist." blurb="Check the address, or head back to your dashboard.">
+      <h1>Page not found</h1>
+      <EmptyState title="We could not find that page" illustration="search">
         <Link to="/" className="btn btn-primary">Go home</Link>
-      </div>
-    </div>
+      </EmptyState>
+    </AuthLayout>
   );
 }

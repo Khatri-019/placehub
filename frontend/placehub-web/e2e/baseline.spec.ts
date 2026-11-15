@@ -20,7 +20,7 @@ test.describe('login per role', () => {
   }
 
   test('wrong password shows the generic error', async ({ page }) => {
-    await page.goto('/login');
+    await page.goto('/login/student');
     await page.getByLabel('Email').fill(SEEDED.student);
     await page.getByLabel('Password', { exact: true }).fill('not-the-password1');
     await page.getByRole('button', { name: 'Sign in' }).click();

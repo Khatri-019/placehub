@@ -207,5 +207,23 @@ Longer rationale for decisions. Operational status lives in `CLAUDE.md`; the spe
 54. **History visibility:** participants only (404 otherwise). For the student, other users' ids and recruiter notes
     on non-withdrawal transitions are blanked (the note is recruiter-internal, decision 16).
 
+55. **Code splitting:** each role area is one lazy chunk loaded through a barrel (`pages/student|recruiter|admin`),
+    so navigation inside an area never waits for another chunk. `scripts/size-check.mjs` (`npm run size`, also run in
+    the frontend Dockerfile) fails the build when the initial JS+CSS+HTML exceeds 120 KB gzip, a role chunk plus the
+    shared chunks it imports exceeds 80 KB, or a role chunk is referenced from index.html. The preloaded Inter woff2
+    (47 KB, already compressed) is reported separately rather than counted in the JS/CSS budget.
+56. **Auto-shortlisted flag (app V6):** a boolean on the application, set in the same transaction as the SYSTEM
+    shortlist, so recruiter lists show the "Auto" badge without reading history per row.
+57. **Portal redirects:** an anonymous visitor to `/student|recruiter|admin/**` is sent to that area's login portal;
+    shared pages go to the `/login` chooser. Sign-out returns to the user's own portal.
+58. **Theme:** `data-theme` is applied in `main.tsx` before the first render (no flash); preference in localStorage
+    behind try/catch, default follows `prefers-color-scheme`. All colours are tokens; component CSS has no hex values.
+59. **CLS fixes found by Lighthouse:** headers that fill in after a fetch reserve fixed height (single line, ellipsis)
+    so the table skeleton below does not move; the mobile user-menu button gets an aria-label (its text is hidden).
+60. **No gateway response compression:** Lighthouse suggests it for JSON, but compressing responses that carry
+    tokens alongside user-controlled input is BREACH-prone and scores are already ≥ 96; nginx gzips static assets.
+61. **Lighthouse method:** user flow (lighthouse 12.8.2 + puppeteer-core, `scripts/lighthouse/`) in one tab, because
+    the session token is per-tab sessionStorage. Default mobile emulation and throttling against the nginx build.
+
 ## Checklist (mirrors spec section 17; proof recorded in CLAUDE.md)
 See `CLAUDE.md` section 4.

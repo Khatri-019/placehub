@@ -11,11 +11,11 @@ vi.mock('../../api/endpoints', () => ({
   authApi: { login: (...args: unknown[]) => loginMock(...args) },
 }));
 
-function renderLogin(path = '/login') {
+function renderLogin(path = '/login/student', portal: 'student' | 'recruiter' | 'admin' = 'student') {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <AuthProvider>
-        <Login />
+        <Login portal={portal} />
       </AuthProvider>
     </MemoryRouter>,
   );
@@ -48,13 +48,30 @@ describe('Login form validation', () => {
     await userEvent.type(screen.getByLabelText('Email'), 'student@placehub.local');
     await userEvent.type(screen.getByLabelText('Password'), 'wrong-pass1');
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-    expect(loginMock).toHaveBeenCalledWith('student@placehub.local', 'wrong-pass1');
+    expect(loginMock).toHaveBeenCalledWith('student@placehub.local', 'wrong-pass1', 'STUDENT');
     expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email or password');
   });
 
   it('shows the session-expired notice', () => {
-    renderLogin('/login?expired=1');
+    renderLogin('/login/student?expired=1');
     expect(screen.getByText(/session expired/i)).toBeInTheDocument();
+  });
+
+  it('sends the portal so the API can reject other roles, and shows its message', async () => {
+    loginMock.mockRejectedValueOnce(new Error('This account is not registered as a recruiter. Use the student login.'));
+    renderLogin('/login/recruiter', 'recruiter');
+    expect(screen.getByRole('heading', { name: 'Recruiter sign in' })).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Email'), 'student@placehub.local');
+    await userEvent.type(screen.getByLabelText('Password'), 'PlaceHub@123');
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(loginMock).toHaveBeenCalledWith('student@placehub.local', 'PlaceHub@123', 'RECRUITER');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Use the student login');
+  });
+
+  it('admin portal has no registration link', () => {
+    renderLogin('/login/admin', 'admin');
+    expect(screen.queryByRole('link', { name: /create a/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/provisioned by the institute/i)).toBeInTheDocument();
   });
 
   it('validateLogin is pure', () => {

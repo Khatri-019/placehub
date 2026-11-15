@@ -1,0 +1,89 @@
+.wrap {
+  max-height: 70vh;
+}
+
+.sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.sort svg { width: 13px; height: 13px; }
+
+.checkCell {
+  width: 44px;
+}
+
+.checkCell input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-primary);
+}
+
+.selected {
+  background: var(--color-highlight-soft);
+}
+
+@media (max-width: 719px) {
+  .wrap {
+    max-height: none;
+    background: none;
+    border: none;
+    overflow: visible;
+  }
+
+  .table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .table,
+  .table tbody,
+  .table tr,
+  .table td {
+    display: block;
+    width: 100%;
+  }
+
+  .table tr {
+    margin-bottom: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+  }
+
+  .table td {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--color-border);
+    text-align: right !important;
+  }
+
+  .table td:last-child { border-bottom: none; }
+
+  .table td[data-label]::before {
+    content: attr(data-label);
+    font-size: var(--font-size-xs);
+    font-weight: var(--weight-semibold);
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    color: var(--color-muted);
+    text-align: left;
+  }
+
+  .checkCell { width: auto; }
+}

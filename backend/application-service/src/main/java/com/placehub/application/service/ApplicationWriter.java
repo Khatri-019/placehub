@@ -70,6 +70,7 @@ public class ApplicationWriter {
     public Application systemShortlist(Application application) {
         ApplicationStatus old = application.getStatus();
         application.changeStatus(ApplicationStatus.SHORTLISTED, null);
+        application.markAutoShortlisted();
         Application saved = applications.saveAndFlush(application);
         history.record(saved, old, ApplicationStatus.SHORTLISTED, ActorType.SYSTEM, null, AutoShortlist.REASON);
         outbox.statusChanged(saved, old, null, ActorType.SYSTEM.name(), AutoShortlist.REASON);

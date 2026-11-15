@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { authApi } from '../../api/endpoints';
 import { parseError } from '../../api/errors';
+import { AuthLayout } from '../../components/AuthLayout';
 import { Field } from '../../components/Field';
 import { emitToast } from '../../components/toastBus';
 import type { RecruiterRegistration } from '../../types';
@@ -38,7 +39,7 @@ export function RegisterRecruiter() {
     try {
       await authApi.registerRecruiter({ ...form, email: form.email.trim() });
       emitToast({ kind: 'success', message: 'Recruiter account created. Please sign in.' });
-      navigate('/login?registered=1');
+      navigate('/login/recruiter?registered=1');
     } catch (err) {
       const parsed = parseError(err);
       setFormError(parsed.message);
@@ -49,8 +50,7 @@ export function RegisterRecruiter() {
   };
 
   return (
-    <div className="auth-page">
-      <div className="card auth-card">
+    <AuthLayout heading="Hire from campus." blurb="Create your recruiter account, then set up your company profile and post your first job.">
         <h1>Recruiter registration</h1>
         <form className="form" onSubmit={onSubmit} noValidate>
           {formError && <div className="form-error" role="alert">{formError}</div>}
@@ -71,8 +71,7 @@ export function RegisterRecruiter() {
           </Field>
           <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? 'Creating account…' : 'Create account'}</button>
         </form>
-        <p className="small muted">Already registered? <Link to="/login">Sign in</Link></p>
-      </div>
-    </div>
+        <p className="small muted">Already registered? <Link to="/login/recruiter">Sign in</Link></p>
+    </AuthLayout>
   );
 }

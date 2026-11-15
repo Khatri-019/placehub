@@ -85,6 +85,9 @@ public class Application {
     @Column(name = "lock_on_placement_snapshot", nullable = false)
     private boolean lockOnPlacementSnapshot;
 
+    @Column(name = "auto_shortlisted", nullable = false)
+    private boolean autoShortlisted;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ApplicationStatus status;
@@ -142,6 +145,14 @@ public class Application {
         this.ratioSnapshot = ratio;
         this.policyBandSnapshot = band;
         this.lockOnPlacementSnapshot = lockOnPlacement;
+    }
+
+    public void markAutoShortlisted() {
+        this.autoShortlisted = true;
+    }
+
+    public boolean isAutoShortlisted() {
+        return autoShortlisted;
     }
 
     public Integer getPolicyVersionSnapshot() {

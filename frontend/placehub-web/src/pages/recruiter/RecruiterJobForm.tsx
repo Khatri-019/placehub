@@ -5,7 +5,7 @@ import { parseError, type ParsedError } from '../../api/errors';
 import { Field } from '../../components/Field';
 import { ErrorState, Spinner } from '../../components/States';
 import { emitToast } from '../../components/toastBus';
-import type { Branch, EmploymentType, JobRequest } from '../../types';
+import type { Branch, EmploymentType, JobRequest, ScreeningMode } from '../../types';
 import { BRANCHES, BRANCH_LABELS, EMPLOYMENT_TYPE_LABELS } from '../../types/enums';
 import { fromLocalInput, toLocalInput } from '../../utils/format';
 
@@ -21,11 +21,14 @@ interface FormState {
   eligibleBranches: Branch[];
   years: string;
   deadline: string;
+  screeningMode: ScreeningMode;
+  autoMinCgpa: string;
+  autoMaxBacklogs: string;
 }
 
 const EMPTY: FormState = {
   title: '', description: '', location: '', employmentType: 'FULL_TIME', ctc: '', ctcLpa: '', minCgpa: '0', maxBacklogs: '0',
-  eligibleBranches: [], years: '', deadline: '',
+  eligibleBranches: [], years: '', deadline: '', screeningMode: 'MANUAL', autoMinCgpa: '', autoMaxBacklogs: '',
 };
 
 function parseYears(raw: string): number[] | null {
@@ -51,6 +54,18 @@ function validate(f: FormState): Record<string, string> {
   if (!Number.isInteger(backlogs) || backlogs < 0 || backlogs > 50) e.maxBacklogs = 'Between 0 and 50';
   if (parseYears(f.years) === null) e.years = 'Comma-separated years between 2020 and 2035';
   if (!f.deadline) e.deadline = 'Deadline is required';
+  if (f.screeningMode === 'AUTO_SHORTLIST') {
+    if (f.autoMinCgpa.trim()) {
+      const auto = Number(f.autoMinCgpa);
+      if (Number.isNaN(auto) || auto < 0 || auto > 10) e.autoMinCgpa = 'Between 0 and 10';
+      else if (!Number.isNaN(cgpa) && auto < cgpa) e.autoMinCgpa = 'Cannot be lower than the eligibility minimum CGPA';
+    }
+    if (f.autoMaxBacklogs.trim()) {
+      const auto = Number(f.autoMaxBacklogs);
+      if (!Number.isInteger(auto) || auto < 0 || auto > 50) e.autoMaxBacklogs = 'Between 0 and 50';
+      else if (Number.isInteger(backlogs) && auto > backlogs) e.autoMaxBacklogs = 'Cannot be higher than the eligibility maximum';
+    }
+  }
   return e;
 }
 
@@ -72,6 +87,9 @@ export function RecruiterJobForm() {
         title: j.title, description: j.description, location: j.location, employmentType: j.employmentType,
         ctc: j.ctc ?? '', ctcLpa: j.ctcLpa == null ? '' : String(j.ctcLpa), minCgpa: String(j.minCgpa), maxBacklogs: String(j.maxBacklogs),
         eligibleBranches: j.eligibleBranches, years: j.eligibleGraduationYears.join(', '), deadline: toLocalInput(j.deadline),
+        screeningMode: j.screeningMode ?? 'MANUAL',
+        autoMinCgpa: j.autoShortlistMinCgpa == null ? '' : String(j.autoShortlistMinCgpa),
+        autoMaxBacklogs: j.autoShortlistMaxBacklogs == null ? '' : String(j.autoShortlistMaxBacklogs),
       }))
       .catch((err) => setLoadError(parseError(err)))
       .finally(() => setLoading(false));
@@ -101,6 +119,11 @@ export function RecruiterJobForm() {
       eligibleBranches: form.eligibleBranches,
       eligibleGraduationYears: parseYears(form.years) ?? [],
       deadline: fromLocalInput(form.deadline),
+      screeningMode: form.screeningMode,
+      autoShortlistMinCgpa: form.screeningMode === 'AUTO_SHORTLIST' && form.autoMinCgpa.trim()
+        ? Math.round(Number(form.autoMinCgpa) * 100) / 100 : undefined,
+      autoShortlistMaxBacklogs: form.screeningMode === 'AUTO_SHORTLIST' && form.autoMaxBacklogs.trim()
+        ? Number(form.autoMaxBacklogs) : undefined,
     };
     setBusy(true);
     try {
@@ -120,8 +143,8 @@ export function RecruiterJobForm() {
   if (loadError) return <ErrorState error={loadError} />;
 
   return (
-    <div>
-      <p className="small"><Link to="/recruiter/jobs">← Back to my jobs</Link></p>
+    <div className="stack">
+      <p className="small" style={{ margin: 0 }}><Link to="/recruiter/jobs">← Back to my jobs</Link></p>
       <div className="page-header">
         <h1>{editing ? 'Edit job' : 'Post a job'}</h1>
       </div>
@@ -184,6 +207,35 @@ export function RecruiterJobForm() {
         <Field id="years" label="Eligible graduation years" error={errors.years} hint="Comma-separated, e.g. 2027, 2028. Leave empty for all years.">
           {(a) => <input {...a} value={form.years} onChange={(e) => setForm({ ...form, years: e.target.value })} />}
         </Field>
+        <fieldset className="field">
+          <legend>Screening</legend>
+          <div className="stack-sm">
+            <label className="check">
+              <input type="radio" name="screeningMode" value="MANUAL" checked={form.screeningMode === 'MANUAL'}
+                onChange={() => setForm({ ...form, screeningMode: 'MANUAL' })} />
+              <span>Manual review: every applicant starts as Applied</span>
+            </label>
+            <label className="check">
+              <input type="radio" name="screeningMode" value="AUTO_SHORTLIST" checked={form.screeningMode === 'AUTO_SHORTLIST'}
+                onChange={() => setForm({ ...form, screeningMode: 'AUTO_SHORTLIST' })} />
+              <span>Auto-shortlist applicants who meet the stricter criteria below</span>
+            </label>
+          </div>
+        </fieldset>
+        {form.screeningMode === 'AUTO_SHORTLIST' && (
+          <div className="form-row">
+            <Field id="autoMinCgpa" label="Auto-shortlist minimum CGPA" error={errors.autoMinCgpa}
+              hint="Empty = same as eligibility minimum">
+              {(a) => <input {...a} type="number" step="0.01" min={0} max={10} value={form.autoMinCgpa}
+                onChange={(e) => setForm({ ...form, autoMinCgpa: e.target.value })} />}
+            </Field>
+            <Field id="autoMaxBacklogs" label="Auto-shortlist maximum backlogs" error={errors.autoMaxBacklogs}
+              hint="Empty = same as eligibility maximum">
+              {(a) => <input {...a} type="number" min={0} max={50} value={form.autoMaxBacklogs}
+                onChange={(e) => setForm({ ...form, autoMaxBacklogs: e.target.value })} />}
+            </Field>
+          </div>
+        )}
         <div>
           <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : editing ? 'Save changes' : 'Save draft'}</button>
         </div>

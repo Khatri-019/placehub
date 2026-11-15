@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { authApi } from '../../api/endpoints';
 import { parseError } from '../../api/errors';
+import { AuthLayout } from '../../components/AuthLayout';
 import { Field } from '../../components/Field';
 import { emitToast } from '../../components/toastBus';
 import type { Branch, StudentRegistration } from '../../types';
@@ -59,7 +60,7 @@ export function RegisterStudent() {
         backlogCount: Number(form.backlogCount),
       });
       emitToast({ kind: 'success', message: 'Account created. Please sign in.' });
-      navigate('/login?registered=1');
+      navigate('/login/student?registered=1');
     } catch (err) {
       const parsed = parseError(err);
       setFormError(parsed.message);
@@ -70,8 +71,7 @@ export function RegisterStudent() {
   };
 
   return (
-    <div className="auth-page">
-      <div className="card auth-card">
+    <AuthLayout heading="Create your student account." blurb="Your academic details are used to check eligibility for every job. Upload your resume after signing in.">
         <h1>Student registration</h1>
         <p className="muted small">Academic details are read-only after registration in v1 (placement office verification is planned).</p>
         <form className="form" onSubmit={onSubmit} noValidate>
@@ -112,8 +112,7 @@ export function RegisterStudent() {
           </div>
           <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? 'Creating account…' : 'Create account'}</button>
         </form>
-        <p className="small muted">Already registered? <Link to="/login">Sign in</Link></p>
-      </div>
-    </div>
+        <p className="small muted">Already registered? <Link to="/login/student">Sign in</Link></p>
+    </AuthLayout>
   );
 }

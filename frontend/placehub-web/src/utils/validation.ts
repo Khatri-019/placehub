@@ -8,3 +8,9 @@ export function validateLogin(email: string, password: string): Record<string, s
   if (!password) errors.password = 'Password is required';
   return errors;
 }
+
+export type PortalKey = 'student' | 'recruiter' | 'admin';
+
+export function isPortalKey(value: string | undefined): value is PortalKey {
+  return value === 'student' || value === 'recruiter' || value === 'admin';
+}

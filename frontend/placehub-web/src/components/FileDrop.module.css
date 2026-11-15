@@ -18,8 +18,8 @@
 }
 
 .dragging {
-  border-color: var(--color-primary);
-  background: var(--color-primary-soft);
+  border-color: var(--color-orange-500);
+  background: var(--color-highlight-soft);
 }
 
 .busy {

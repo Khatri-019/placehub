@@ -13,6 +13,9 @@ function renderAt(path: string) {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<p>Login page</p>} />
+          <Route path="/login/admin" element={<p>Admin login page</p>} />
+          <Route path="/login/recruiter" element={<p>Recruiter login page</p>} />
+          <Route path="/notifications" element={<ProtectedRoute><p>Notifications</p></ProtectedRoute>} />
           <Route path="/student" element={<p>Student home</p>} />
           <Route path="/recruiter" element={<p>Recruiter home</p>} />
           <Route path="/admin" element={<ProtectedRoute roles={['ADMIN']}><p>Admin area</p></ProtectedRoute>} />
@@ -24,8 +27,13 @@ function renderAt(path: string) {
 }
 
 describe('ProtectedRoute', () => {
-  it('redirects anonymous users to login', () => {
+  it('redirects anonymous users to the login portal of the area they opened', () => {
     renderAt('/admin');
+    expect(screen.getByText('Admin login page')).toBeInTheDocument();
+  });
+
+  it('redirects anonymous users on shared pages to the portal chooser', () => {
+    renderAt('/notifications');
     expect(screen.getByText('Login page')).toBeInTheDocument();
   });
 
@@ -51,7 +59,7 @@ describe('ProtectedRoute', () => {
   it('treats an expired token as signed out', () => {
     signInAs('RECRUITER', -60);
     renderAt('/recruiter/jobs');
-    expect(screen.getByText('Login page')).toBeInTheDocument();
+    expect(screen.getByText('Recruiter login page')).toBeInTheDocument();
     expect(sessionStorage.getItem('placehub.token')).toBeNull();
   });
 

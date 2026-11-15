@@ -3,7 +3,11 @@ import type {
   AccountStatus, Application, ApplicationStatus, Branch, Company, CompanyRequest, EligibilityPreview,
   EmploymentType, Job, JobRequest, JobStatus, LoginResponse, Notification, Page, RecruiterRegistration, Role,
   ResumeMetadata, ResumeOverview, StatusStats, StudentRegistration, User,
+  AuditEntry, BulkResult, ConsentRecord, HistoryEntry, Placement, PlacementStateView, Policy, PolicyDraft,
+  PolicyEvaluation,
 } from '../types';
+
+export type Portal = 'STUDENT' | 'RECRUITER' | 'ADMIN';
 
 type Params = Record<string, string | number | boolean | undefined>;
 
@@ -14,8 +18,8 @@ function clean(params: Params): Params {
 
 // ---------------------------------------------------------------- auth & users (user-service)
 export const authApi = {
-  login: (email: string, password: string) =>
-    api.post<LoginResponse>('/api/auth/login', { email, password }).then((r) => r.data),
+  login: (email: string, password: string, portal?: Portal) =>
+    api.post<LoginResponse>('/api/auth/login', { email, password, portal }).then((r) => r.data),
   registerStudent: (body: StudentRegistration) =>
     api.post<User>('/api/auth/register/student', body).then((r) => r.data),
   registerRecruiter: (body: RecruiterRegistration) =>
@@ -83,16 +87,23 @@ export const jobApi = {
 
 // ---------------------------------------------------------------- applications (application-service)
 export const applicationApi = {
-  apply: (jobId: string) => api.post<Application>('/api/applications', { jobId }).then((r) => r.data),
+  apply: (jobId: string, consent?: { accepted: boolean; signedName: string }) =>
+    api.post<Application>('/api/applications', { jobId, consent }).then((r) => r.data),
+  history: (id: string) => api.get<HistoryEntry[]>(`/api/applications/${id}/history`).then((r) => r.data),
+  bulkStatus: (applicationIds: string[], status: ApplicationStatus, note?: string) =>
+    api.patch<BulkResult>('/api/applications/bulk-status', { applicationIds, status, note }).then((r) => r.data),
+  autoScreen: (jobId: string) =>
+    api.post<{ shortlisted: number; evaluated: number }>(`/api/applications/job/${jobId}/auto-screen`).then((r) => r.data),
+  placementState: () => api.get<PlacementStateView>('/api/applications/me/placement-state').then((r) => r.data),
   eligibility: (jobId: string) =>
     api.get<EligibilityPreview>('/api/applications/eligibility', { params: { jobId } }).then((r) => r.data),
-  mine: (p: { status?: ApplicationStatus | ''; page?: number; size?: number }) =>
+  mine: (p: { status?: ApplicationStatus | ''; page?: number; size?: number; sort?: string }) =>
     api.get<Page<Application>>('/api/applications/me', { params: clean(p) }).then((r) => r.data),
   get: (id: string) => api.get<Application>(`/api/applications/${id}`).then((r) => r.data),
   resumeBlob: (id: string) =>
     api.get<Blob>(`/api/applications/${id}/resume`, { responseType: 'blob' }).then((r) => r.data),
   withdraw: (id: string) => api.patch<Application>(`/api/applications/${id}/withdraw`).then((r) => r.data),
-  forJob: (jobId: string, p: { status?: ApplicationStatus | ''; page?: number; size?: number }) =>
+  forJob: (jobId: string, p: { status?: ApplicationStatus | ''; page?: number; size?: number; sort?: string }) =>
     api.get<Page<Application>>(`/api/applications/job/${jobId}`, { params: clean(p) }).then((r) => r.data),
   updateStatus: (id: string, status: ApplicationStatus, note?: string) =>
     api.patch<Application>(`/api/applications/${id}/status`, { status, note }).then((r) => r.data),
@@ -100,6 +111,37 @@ export const applicationApi = {
     api.get<Page<Application>>('/api/admin/applications', { params: clean(p) }).then((r) => r.data),
   myStats: () => api.get<StatusStats>('/api/applications/stats/me').then((r) => r.data),
   recruiterStats: () => api.get<StatusStats>('/api/applications/stats/recruiter').then((r) => r.data),
+};
+
+// ---------------------------------------------------------------- placement policy (application-service, admin)
+export const policyApi = {
+  active: () => api.get<Policy>('/api/admin/policy').then((r) => r.data),
+  versions: (p: { page?: number; size?: number }) =>
+    api.get<Page<Policy>>('/api/admin/policy/versions', { params: clean(p) }).then((r) => r.data),
+  save: (draft: PolicyDraft, changeNote: string) =>
+    api.put<Policy>('/api/admin/policy', { ...draft, changeNote }).then((r) => r.data),
+  simulate: (body: { currentCtc: number | null; jobCtc: number | null; employmentType: EmploymentType; locked: boolean;
+    policy?: PolicyDraft }) => api.post<PolicyEvaluation>('/api/admin/policy/simulate', body).then((r) => r.data),
+  audit: (p: { page?: number; size?: number }) =>
+    api.get<Page<AuditEntry>>('/api/admin/policy/audit', { params: clean(p) }).then((r) => r.data),
+};
+
+export const placementApi = {
+  list: (p: { locked?: boolean | ''; source?: string; company?: string; page?: number; size?: number }) =>
+    api.get<Page<Placement>>('/api/admin/placements', { params: clean({ ...p, locked: p.locked === '' ? undefined : p.locked }) })
+      .then((r) => r.data),
+  offCampus: (body: { studentUserId: string; companyName: string; ctcLpa: number; lock: boolean }) =>
+    api.post<Placement>('/api/admin/placements/off-campus', body).then((r) => r.data),
+  lock: (studentId: string, reason: string) => api.post(`/api/admin/students/${studentId}/lock`, { reason }).then((r) => r.data),
+  unlock: (studentId: string, reason: string) =>
+    api.post(`/api/admin/students/${studentId}/unlock`, { reason }).then((r) => r.data),
+};
+
+export const consentApi = {
+  list: (p: { jobId?: string; studentUserId?: string; page?: number; size?: number }) =>
+    api.get<Page<ConsentRecord>>('/api/admin/consents', { params: clean(p) }).then((r) => r.data),
+  exportCsv: (p: { jobId?: string; studentUserId?: string }) =>
+    api.get<Blob>('/api/admin/consents/export.csv', { params: clean(p), responseType: 'blob' }).then((r) => r.data),
 };
 
 // ---------------------------------------------------------------- notifications (notification-service)

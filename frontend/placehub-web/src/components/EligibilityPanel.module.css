@@ -1,19 +1,24 @@
 .panel {
   padding: var(--space-4);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
+  border-left-width: 4px;
   background: var(--color-surface);
 }
 
 .title {
-  font-size: var(--font-size-md);
   margin: 0 0 var(--space-2);
+  font-size: var(--font-size-md);
 }
 
-.ok { border-color: var(--color-success); background: var(--color-success-soft); }
-.bad { border-color: var(--color-danger); background: var(--color-danger-soft); }
-.warn { border-color: var(--color-warning); background: var(--color-warning-soft); }
-.info { border-color: var(--color-primary); background: var(--color-primary-soft); }
+.panel p {
+  margin: 0;
+}
+
+.ok { border-left-color: var(--tone-success-fg); background: var(--tone-success-bg); color: var(--tone-success-fg); }
+.bad { border-left-color: var(--tone-danger-fg); background: var(--tone-danger-bg); color: var(--tone-danger-fg); }
+.warn { border-left-color: var(--tone-warning-fg); background: var(--tone-warning-bg); color: var(--tone-warning-fg); }
+.info { border-left-color: var(--tone-info-fg); background: var(--tone-info-bg); color: var(--tone-info-fg); }
 
 .reasons {
   margin: 0;

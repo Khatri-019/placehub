@@ -34,7 +34,7 @@ public final class ApplicationDtos {
                                       String branch, BigDecimal cgpa, int graduationYear, int backlogCount,
                                       ApplicationStatus status, String recruiterNote, Instant appliedAt,
                                       Instant updatedAt, BigDecimal ctcLpa, String employmentType,
-                                      boolean hasResume, String policyDecision) {
+                                      boolean hasResume, String policyDecision, boolean autoShortlisted) {
     }
 
     /**

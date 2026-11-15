@@ -1,0 +1,13 @@
+{
+  "name": "placehub-lighthouse",
+  "private": true,
+  "type": "module",
+  "description": "Lighthouse user flow for the compose stack (kept apart from the app's dependencies).",
+  "scripts": {
+    "flow": "node flow.mjs"
+  },
+  "dependencies": {
+    "lighthouse": "12.8.2",
+    "puppeteer-core": "24.22.0"
+  }
+}

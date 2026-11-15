@@ -1,0 +1,36 @@
+.ribbon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-1) var(--space-4);
+  background: var(--color-ribbon-bg);
+  color: var(--color-ribbon-fg);
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.ribbon a {
+  color: var(--color-ribbon-fg);
+}
+
+.close {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-ribbon-fg);
+  cursor: pointer;
+}
+
+.close:hover {
+  background: var(--color-highlight-soft);
+}
+
+.close svg {
+  width: 16px;
+  height: 16px;
+}

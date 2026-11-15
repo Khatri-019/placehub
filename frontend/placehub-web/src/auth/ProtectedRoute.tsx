@@ -14,7 +14,10 @@ export function ProtectedRoute({ roles, children }: Props) {
   const { user } = useAuth();
   const location = useLocation();
   if (!user) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    // Send people to the portal of the area they tried to open; the chooser otherwise.
+    const area = location.pathname.split('/')[1];
+    const target = area === 'student' || area === 'recruiter' || area === 'admin' ? `/login/${area}` : '/login';
+    return <Navigate to={target} replace state={{ from: location.pathname }} />;
   }
   if (roles && !roles.includes(user.role)) {
     return <Navigate to={ROLE_HOME[user.role]} replace />;
