@@ -89,5 +89,32 @@ Longer rationale for decisions. Operational status lives in `CLAUDE.md`; the spe
 22. **Smoke script extras.** Besides the 16 spec scenarios, the script also checks withdraw → 409 on a second
     withdraw → recruiter notified (a Definition of Done item).
 
+## v3 (Phase 9) decisions
+
+### 9.0 Groundwork
+23. **Git baseline.** The repo was already initialised on `main` at the user's request after v2 (`305851c`). The
+    requested baseline commit `chore: baseline v2 build` (`2144986`) adds Section 20 and the ignore rules on top of it.
+24. **Extension leftovers.** `.vscode/settings.json` is kept with the two Java build settings (the unrelated Python
+    setting was dropped), and `.vscode/extensions.json` recommends the Java, Spring, ESLint and Playwright extensions.
+    The rest of `.vscode/` is ignored. `.github/modernize/` holds the app-modernization extension's own hook scripts;
+    it is kept on disk so the extension keeps working, and it is gitignored.
+25. **Health groups.** `management.endpoint.health.probes.enabled=true`; liveness includes `livenessState,ping`;
+    readiness includes `readinessState` plus `db` (user, job, application) or `mongo` (notification). Compose
+    healthchecks use `/actuator/health/liveness`, so a Kafka, DB or Eureka outage never marks a JVM unhealthy.
+26. **Kafka unresolvable host (bug found by the 9.0 outage test).** When the kafka container is stopped its DNS name
+    stops resolving, and Kafka client constructors throw `ConfigException: No resolvable bootstrap urls`. Two of these
+    ran during startup and aborted the context: the health indicator's `AdminClient` and the notification listener
+    consumers. Fix: the health indicator creates its admin client lazily, and the notification listeners use
+    `auto-startup=false` and are started by `KafkaListenerStarter` (scheduled every 5 s; it waits for the host to
+    resolve, then calls `KafkaAdmin.initialize()` and starts the registry). The producer was already lazy, so the
+    outbox simply retries.
+27. **Timezone.** `TimeZone.setDefault(UTC)` runs first in every `main`, and the spring-boot plugin passes
+    `-Duser.timezone=UTC`. Verified by `spring-boot:run` on an India Standard Time host with the plugin flag
+    overridden.
+28. **Enforcer.** `requireJavaVersion [25,)` and `requireMavenVersion [3.9,)` in the parent POM's `<plugins>`.
+29. **Playwright.** Pinned `@playwright/test` 1.56.1 and `@axe-core/playwright` 4.11.0 (Chromium only), in
+    `frontend/placehub-web/e2e`. Tests arrange their own recruiters, companies and jobs through the gateway API, so
+    seeded demo data stays clean. The baseline suite of 8 v2 flows passed on the first run and found no UI bugs.
+
 ## Checklist (mirrors spec section 17; proof recorded in CLAUDE.md)
 See `CLAUDE.md` section 4.
