@@ -8,12 +8,22 @@ target/
 node_modules/
 dist/
 coverage/
+playwright-report/
+test-results/
+blob-report/
+e2e/.auth/
+.lighthouseci/
+lighthouse-reports/
 *.tsbuildinfo
 
 # IDE / OS
 .idea/
 *.iml
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+# VS Code app-modernization extension working files (kept on disk for the extension, never committed)
+.github/modernize/
 .DS_Store
 Thumbs.db
 

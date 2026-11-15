@@ -873,6 +873,10 @@ Seed only in the `dev` profile, idempotently, using a Flyway location `classpath
 | Job 2 | `20000000-0000-0000-0000-000000000002` |
 | Job 3 | `20000000-0000-0000-0000-000000000003` |
 | Job 4 (draft) | `20000000-0000-0000-0000-000000000004` |
+| Recruiter 2 (v3) | `00000000-0000-0000-0000-000000000005` |
+| Company Meridian Analytics (v3) | `10000000-0000-0000-0000-000000000002` |
+| Job 5 Senior Data Engineer (v3) | `20000000-0000-0000-0000-000000000005` |
+| Job 6 Quant Developer (v3) | `20000000-0000-0000-0000-000000000006` |
 
 **Accounts** (password `PlaceHub@123` for all, local demo only):
 
@@ -1036,3 +1040,233 @@ You are the autonomous senior full-stack engineer delivering PlaceHub Lite.
 20. Final report must include: what was implemented, architecture and ports, how to start, demo credentials, every build/test command run with real results (pass/fail/skip counts), smoke script output, known limitations and incomplete work.
 
 **Begin implementation now. Do not return only a plan. Continue through implementation, testing, and documentation until the Definition of Done is satisfied or a genuine environment blocker prevents further progress.**
+
+------------------------------------------------------------------------
+
+# 20. v3 Feature Additions
+
+This section is part of the authoritative specification. Where it conflicts with an earlier section, this section
+wins. Everything here is additive: no existing endpoint, smoke check or test is removed.
+
+## 20.0 Constraints and groundwork
+
+- No new containers or services. Per-container memory limits from v2 stay unless a measured OOM (exit 137) forces a
+  raise, which is recorded with before/after numbers.
+- Architecture rules are unchanged: database per service, JWT validated in every service, `/internal/**` only with
+  `X-Internal-Token`, events only through the outbox.
+- Kafka changes are additive only: new optional fields, `eventVersion` stays 1, `contracts/events/*.json` fixtures are
+  updated to match, and new topics get new fixtures.
+- Git: work happens on `main`, with one conventional commit per sub-phase. Nothing is ever pushed.
+- Health: each service exposes `/actuator/health/liveness` (`livenessState`, `ping` only; never Kafka, Mongo, DB or
+  Eureka) and `/actuator/health/readiness` (`readinessState` plus the service's own data store). Kafka stays visible in
+  `/actuator/health` but never fails liveness. Compose healthchecks use `/actuator/health/liveness`.
+- Timezone: every `main` calls `TimeZone.setDefault(UTC)` before `SpringApplication.run`, and the
+  spring-boot-maven-plugin runs with `-Duser.timezone=UTC`.
+- `maven-enforcer-plugin` requires Java 25+ and Maven 3.9+.
+- Browser tests: Playwright (Chromium only) plus `@axe-core/playwright` in `frontend/placehub-web/e2e`, run headless
+  against the compose stack at `http://localhost:5173` with `npm run e2e`. UI bugs found this way are fixed in the app.
+
+## 20.1 Numeric CTC
+
+- Job Service adds `ctcLpa DECIMAL(6,2)` (lakhs per annum, 0.01 to 9999.99). It is **required to publish a FULL_TIME
+  job** (400 otherwise) and optional for INTERNSHIP. The free-text `ctc` stays as a display label.
+- `GET /internal/jobs/{id}/summary` additionally returns `ctcLpa`, `employmentType`, `screeningMode`, and the
+  *effective* auto-shortlist criteria (`autoShortlistMinCgpa`, `autoShortlistMaxBacklogs`, which fall back to the
+  eligibility criteria when unset).
+- Application Service snapshots `ctcLpaSnapshot` and `employmentTypeSnapshot` on every new application.
+- Seed changes (dev only): Graduate Software Engineer 12.00, Embedded Systems Engineer 8.00, Platform Engineer (draft)
+  18.00, Data Analyst Intern unchanged (internship with stipend text only). New recruiter `recruiter2@placehub.local`
+  (`...0005`, password `PlaceHub@123`) owns "Meridian Analytics" (`10000000-...-0002`), which has two PUBLISHED
+  FULL_TIME jobs open to all branches and years with CGPA >= 6.0 and 0 backlogs allowed: "Senior Data Engineer" 20.00
+  (`20000000-...-0005`) and "Quant Developer" 30.00 (`20000000-...-0006`).
+
+## 20.2 Resumes
+
+- User Service owns resume files and stores them in its own Postgres in a `resumes` table: `id`, `user_id`,
+  `original_filename`, `size_bytes`, `sha256`, `content bytea`, `uploaded_at`, `is_current`, `referenced`. It keeps
+  the 3 most recent versions per student, plus any older version an application references (those are never pruned).
+  S3-compatible object storage is listed as production hardening.
+- Endpoints:
+  - `POST /api/users/me/resume` (STUDENT, multipart field `file`): PDF only, at most 2 MB (2 097 152 bytes). The
+    `%PDF-` magic bytes are checked; the declared content type alone is not trusted. The filename is sanitised.
+    Returns metadata. An oversized file returns 413; a non-PDF returns 415; an empty file returns 400.
+  - `GET /api/users/me/resume` returns the current version plus the version list (404 if none).
+  - `GET /api/users/me/resume/file` streams the current PDF.
+  - `DELETE /api/users/me/resume/{id}`: 409 when an application references that version; 404 when it is not the
+    caller's.
+  - `GET /internal/users/{userId}/resumes/{resumeId}/file` (internal token) streams a version, and only if it belongs
+    to `userId`.
+  - `POST /internal/users/{userId}/resumes/{resumeId}/reference` (internal token) marks a version as referenced.
+    Application Service calls it while applying (direction application to user, which already exists), which is how
+    User Service knows a version may not be deleted.
+- Download headers: `Content-Type: application/pdf`, `Content-Disposition: attachment; filename="<sanitised>"`,
+  `X-Content-Type-Options: nosniff`, `Cache-Control: private, no-store`.
+- Size limits: the gateway applies a `RequestSize` limit of 1 MB on every route except `POST /api/users/me/resume`,
+  which allows 2.2 MB (a 2 MB file plus the multipart envelope). User Service's multipart limits are 2 MB per file and
+  2.2 MB per request; multipart is only accepted on that route.
+- The academic-profile internal response gains an optional `currentResumeId`. On apply, Application Service stores
+  `resumeIdSnapshot`; later uploads never change what a recruiter receives.
+- `GET /api/applications/{id}/resume` is allowed for the owning student, the owning recruiter and ADMIN; anyone else
+  gets 404. Application Service checks ownership, then streams the file from User Service's internal endpoint.
+- Frontend: a resume card on the student profile (drag-and-drop plus file picker, metadata, view, replace, versions);
+  a "no resume" warning on job details; "View resume" in recruiter views, opened as a blob URL fetched with the bearer
+  header (never a token in a URL).
+
+## 20.3 Placement policy engine
+
+- Owned by Application Service in package `com.placehub.application.policy`, with its own tables in
+  `placehub_applications`. No new service.
+- **Placement:** a SELECTED application on a FULL_TIME job, or an off-campus placement an admin records manually.
+  **Current CTC:** the highest `ctcLpa` among a student's placements. **Locked:** the student was placed in a band with
+  `lockOnPlacement`, or an admin locked them manually. A locked student can apply to nothing until an admin unlocks
+  them with a reason. An unplaced, unlocked student has no CTC restrictions.
+- **Policy versions:** exactly one version is active; every change creates a new version; old versions are kept
+  forever. Fields:
+  - `bands`: an ordered list of `{fromMultiplier, toMultiplier|null, action: BLOCK|REQUIRE_CONSENT|ALLOW,
+    lockOnPlacement}`.
+  - `appliesToInternships` (default false), `maxActiveConsents` (null or >= 1), `resumeRequired` (default true),
+    `withdrawOtherApplicationsOnLock` (default true).
+  - `consentText`: markdown with placeholders `{{companyName}}`, `{{jobTitle}}`, `{{ctcLpa}}`, `{{currentCtc}}`.
+  - `effectiveFrom`, `changedByUserId`, `changeNote` (required).
+- **Default policy v1** (versioned Flyway migration, all profiles): `[0,1.5) BLOCK`,
+  `[1.5,2.0) REQUIRE_CONSENT lockOnPlacement=true`, `[2.0,inf) ALLOW lockOnPlacement=false`.
+- **Band validation** (400 with a clear message otherwise): at least one band; the first `fromMultiplier` is 0; each
+  band's `to` equals the next band's `from` (no gaps or overlaps); every `from < to`; multipliers other than the first
+  0 are > 0 with at most 2 decimals and <= 100; the last band is open-ended (`to = null`) and only the last is. Consent
+  text is required (<= 20 000 chars) when any band is REQUIRE_CONSENT. The change note is required (<= 500 chars).
+- **Evaluation** happens in a pure `PolicyEvaluator` (no Spring, injected `Clock`). Input: placement state
+  (`currentCtc` or null, `locked`), job `ctcLpa` and `employmentType`, and the policy. Output: `{decision, reasons[],
+  matchedBand, policyVersion, ratio}`. The rules apply in this order:
+  1. A locked student gets BLOCK with code STUDENT_LOCKED.
+  2. An INTERNSHIP when `appliesToInternships` is false gets ALLOW.
+  3. A job without `ctcLpa` (FULL_TIME, or an internship when internships are covered) gets BLOCK with "Job CTC not
+     configured; contact the placement office".
+  4. An unplaced student gets ALLOW.
+  5. Otherwise `ratio = jobCtc / currentCtc`. Band matching uses exact arithmetic (`jobCtc >= currentCtc * from` and
+     `jobCtc < currentCtc * to`), so 1.50x lands in the consent band and 2.00x in the allow band. The ratio is
+     reported rounded to 2 decimals.
+- **Apply order:** eligibility (Job Service), then resume check, policy evaluation, duplicate check, persist. All
+  failing reasons come back in one 422. The error body stays backward compatible: `details.reasons` (array of strings)
+  is unchanged; `details.violations` is a new array of `{code, message}` with codes NOT_ELIGIBLE, RESUME_REQUIRED,
+  POLICY_BLOCKED, CONSENT_REQUIRED, STUDENT_LOCKED and CONSENT_LIMIT_REACHED; `details.consent` (`{renderedText,
+  policyVersion, band}`) is present when consent is needed.
+- **Consent:** `POST /api/applications` accepts an optional `consent: {accepted, signedName}`. In the consent band, a
+  missing, unaccepted or mismatched consent (signedName must equal the student's full name, trimmed and
+  case-insensitive) gives 422 CONSENT_REQUIRED. A valid consent is stored immutably in the same transaction as the
+  application: `id, applicationId, studentUserId, jobId, policyVersion, band, consentTextHash (sha256 of the rendered
+  text), renderedText, signedName, acceptedAt, clientIp, userAgent`. `clientIp` is the last `X-Forwarded-For` entry
+  (the address the gateway saw); `userAgent` comes from the forwarded `User-Agent`. Consent sent outside the consent
+  band is ignored. Consent applies to the job in the request only and cannot be replayed onto another job.
+- **maxActiveConsents:** when set, a student with that many non-terminal consent-band applications gets 422
+  CONSENT_LIMIT_REACHED for another consent-band job.
+- **Snapshots:** each new application stores `policyVersionSnapshot`, `policyDecisionSnapshot`, `ratioSnapshot`,
+  `policyBandSnapshot` (text) and `lockOnPlacementSnapshot`. Policy changes never alter existing applications.
+- **Selection:** when an application moves to SELECTED on a FULL_TIME job, the same transaction:
+  - records a placement (`id, studentUserId, studentName, applicationId|null, companyName, ctcLpa, band, locked,
+    source ON_CAMPUS|OFF_CAMPUS, recordedAt, recordedBy`);
+  - locks the student if the application's `lockOnPlacementSnapshot` is true;
+  - if the student becomes locked and the active policy's `withdrawOtherApplicationsOnLock` is true, moves every other
+    non-terminal application to WITHDRAWN with actor SYSTEM and reason "Withdrawn by placement policy: student
+    placed", each with the usual status-changed event;
+  - emits `STUDENT_PLACEMENT_RECORDED` on the new topic `placehub.placement.recorded.v1` (key `studentUserId`), which
+    notifies the student.
+- **Preview:** `GET /api/applications/eligibility?jobId=` additionally returns `policy` (`decision, reasons, matchedBand,
+  ratio, policyVersion`), `consentText` when needed, `resumeRequired`, `hasResume`, `violations`, and the student's
+  `placementState`.
+- **Endpoints** (ADMIN unless stated otherwise):
+  - `GET /api/admin/policy` returns the active policy. `GET /api/admin/policy/versions` returns paginated history.
+    `PUT /api/admin/policy` takes the full policy plus `changeNote` and creates a new version.
+  - `POST /api/admin/policy/simulate {currentCtc|null, jobCtc, employmentType, locked, policy?}` runs the evaluator.
+    The optional `policy` is a draft to simulate unsaved edits; without it the active policy is used.
+  - `GET /api/admin/placements?locked=&source=&company=`.
+    `POST /api/admin/placements/off-campus {studentUserId, companyName, ctcLpa, lock}`.
+  - `POST /api/admin/students/{id}/lock {reason}` and `POST /api/admin/students/{id}/unlock {reason}`, both audited.
+  - `GET /api/admin/consents?jobId=&studentUserId=` and `GET /api/admin/consents/export.csv` (CSV-injection safe).
+  - `GET /api/admin/policy/audit` (paginated) lists `policy_audit_log` rows: `actor, action, before, after, reason,
+    timestamp` for every version change, lock, unlock and off-campus record.
+  - `GET /api/applications/me/placement-state` (STUDENT): `currentCtc`, `locked`, `lockReason`, `placements`,
+    `policyVersion`, `policyEffectiveFrom`, and a plain-language description of each band for this student.
+- Consent IPs and user agents are visible only through admin endpoints; recruiters never see consents.
+
+## 20.4 Auto-shortlisting
+
+- Job Service adds `screeningMode MANUAL|AUTO_SHORTLIST` (default MANUAL; every existing job stays MANUAL) and optional
+  `autoShortlistMinCgpa` and `autoShortlistMaxBacklogs`. These must be at least as strict as the eligibility criteria
+  (`autoShortlistMinCgpa >= minCgpa`, `autoShortlistMaxBacklogs <= maxBacklogs`), otherwise 400. On `PUT`, a null
+  `screeningMode` keeps the current mode.
+- When an application is created for an AUTO_SHORTLIST job and the snapshot meets the effective criteria, the same
+  transaction stores it as APPLIED and immediately moves it to SHORTLISTED with actor SYSTEM. It writes two outbox
+  events in order: APPLICATION_CREATED (new optional field `autoShortlisted: true`), then APPLICATION_STATUS_CHANGED
+  with `changedByUserId: null` and new optional fields `actorType: "SYSTEM"` and `reason`. Outbox rows are relayed in
+  insertion order (`seq` column).
+- An `application_status_history` table (`id, applicationId, fromStatus|null, toStatus, actorType USER|SYSTEM,
+  actorUserId|null, reason, changedAt`) gets a row for every transition, including creation, withdrawals and policy
+  withdrawals. `GET /api/applications/{id}/history` is open to the owning student, the owning recruiter and ADMIN.
+- `PATCH /api/applications/bulk-status {applicationIds[1..100], status, note}` (owning recruiter or ADMIN): each item
+  runs in its own transaction with the same rules as the single update. The response is
+  `{results: [{applicationId, success, status|null, code|null, message|null}], succeeded, failed}`.
+- `POST /api/applications/job/{jobId}/auto-screen` (owning recruiter or ADMIN; 409 unless the job is AUTO_SHORTLIST)
+  shortlists every qualifying APPLIED application as SYSTEM and returns `{shortlisted, evaluated}`.
+- Notifications: the student gets "You were automatically shortlisted for {jobTitle} at {companyName}". The recruiter's
+  new-applicant notification says when the applicant was auto-shortlisted. A system withdrawal tells the recruiter
+  that the student was withdrawn by placement policy.
+
+## 20.5 Login portals
+
+- The landing page shows three portal cards. `/login/student`, `/login/recruiter` and `/login/admin` have
+  portal-specific copy and registration links (none for admin). `/login` shows the three choices.
+- `POST /api/auth/login` accepts an optional `portal` (STUDENT|RECRUITER|ADMIN). With correct credentials and a
+  different role it returns 403 "This account is not registered as a {portal}. Use the {actualRole} login." A wrong
+  password always returns the generic 401. The portal check happens after the password check and before the
+  account-status check.
+
+## 20.6 UI redesign
+
+- Plain CSS with tokens (`tokens.css`) and CSS modules; no hex values in component CSS. The only new runtime
+  dependency is `lucide-react` (individual icon imports). Self-hosted Inter woff2 (400 and 600, latin subset,
+  `font-display: swap`, preloaded).
+- Brand tokens: navy-900 `#201E3E`, navy-800 `#2B2950`, navy-700 `#3A3866`, orange-500 `#E46A16`, orange-600 `#C2560F`,
+  orange-700 `#9A3412`, raspberry-500 `#B14668`, raspberry-600 `#A8406A`, gradient `#AB3A60` to `#DE672D`, cream-100
+  `#FFF9E6`. Neutrals: page `#F7F6FA`, card `#FFFFFF`, text `#1C1B2E`, muted `#5B5A72`, border `#E4E2EC`. Destructive
+  red `#C62828`. Dark theme: background `#14132A`, surfaces `#201E3E` and `#2B2950`, text `#ECEBF5`. Dark follows
+  `prefers-color-scheme`, with a toggle saved to localStorage (inside try/catch).
+- Contrast rules: white text only on navy, orange-600 or darker, or raspberry-500 or darker; text on orange-500 is
+  navy-900; orange or raspberry text on white only at 16px+ or weight 600+. Enforced with axe in Playwright.
+- Usage, as given in the v3 brief: navy sidebar with an orange active bar; white top bar with a gradient bottom
+  border; a student-only policy ribbon (7 days after a new policy version, dismissible); the gradient used sparingly;
+  orange-600 primary buttons, raspberry outline secondary, red destructive; semantic status badges with an icon plus
+  text; policy badges Open, Consent needed, Blocked and Locked.
+- Performance budget (enforced by `npm run size`, which reads the Vite manifest and gzips the chunks):
+  - every role area is a `React.lazy` route chunk;
+  - initial JS <= 120 KB gzip on landing and login;
+  - each role chunk <= 80 KB gzip.
+- Lighthouse targets on landing, login, student jobs and recruiter applicants: Performance >= 90, Accessibility >= 95,
+  Best Practices >= 95. CLS < 0.05.
+- Reusable components: Button, Input/Select/Checkbox, Card, StatCard, DataTable (sticky header, sortable, row
+  selection, mobile cards), Badge, Tabs, Modal (focus trap, Escape), Drawer, Toast, Skeleton, EmptyState (inline SVG),
+  Pagination, FileDrop, Stepper, Timeline, ConfirmDialog. Transitions are CSS-only, 150-200 ms, and respect
+  `prefers-reduced-motion`.
+
+## 20.7 Permission matrix additions
+
+| Action | STUDENT | RECRUITER | ADMIN |
+|--------|---------|-----------|-------|
+| Upload/list/delete own resume | own | no | no |
+| Download resume of an application | own application | applications to own jobs | yes |
+| View application history | own | own jobs | yes |
+| Bulk status / auto-screen | no | own jobs | yes |
+| Read placement state | own | no | (via admin pages) |
+| Policy read/update/simulate, versions, audit | no | no | yes |
+| Placements, off-campus, lock/unlock | no | no | yes |
+| Consents list/export (incl. IP, user agent) | no | no | yes |
+| Login through a portal of another role | 403 (only with correct password) | 403 | 403 |
+
+## 20.8 Verification additions
+
+- Unit tests: every PolicyEvaluator rule and boundary, band validation, consent validation, the auto-shortlist
+  decision, bulk per-item results, portal mismatch, and resume validation.
+- Testcontainers: resume upload, download, IDOR and version snapshot; consent-band 422/201; lock band selection with
+  auto-withdrawal and events; policy versioning; auto-shortlist event order.
+- `scripts/e2e-smoke.sh` gains the eight v3 scenarios from the brief. Playwright covers the v2 flows plus the v3 UI and
+  runs axe in both themes. Screenshots go to `docs/screenshots/`; the latest smoke output goes to
+  `docs/verification/`.
